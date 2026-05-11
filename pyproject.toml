@@ -59,3 +59,6 @@ select = ["E", "F", "W"]
 
 [tool.coverage.run]
 omit = ["tests/*"]
+
+[tool.mypy]
+ignore_missing_imports = true
