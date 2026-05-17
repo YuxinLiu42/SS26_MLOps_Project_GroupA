@@ -6,6 +6,7 @@ import hydra
 import torch
 import wandb
 from omegaconf import DictConfig, OmegaConf
+from typing import cast
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -68,7 +69,9 @@ def train(cfg: DictConfig) -> None:
 
     wandb.init(
         project="project_name",
-        config=OmegaConf.to_container(cfg, resolve=True),
+        config=cast(
+            dict, OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+        ),
     )
 
     for epoch in range(cfg.epochs):
