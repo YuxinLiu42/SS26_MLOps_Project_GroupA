@@ -1,6 +1,9 @@
 """still need to modify."""
 
 from fastapi import FastAPI
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 

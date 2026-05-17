@@ -8,6 +8,9 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from project_name.model import Model
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @hydra.main(config_path="../../configs", config_name="train", version_base=None)
@@ -32,10 +35,10 @@ def train(cfg: DictConfig) -> None:
             total_loss += loss.item()
 
         avg_loss = total_loss / len(dataloader)
-        print(f"Epoch {epoch+1}/{cfg.epochs} — loss: {avg_loss:.4f}")
+        logger.info(f"Epoch {epoch+1}/{cfg.epochs} — loss: {avg_loss:.4f}")
 
     torch.save(model.state_dict(), "models/model.pt")
-    print("Model saved to models/model.pt")
+    logger.info("Model saved to models/model.pt")
 
 
 if __name__ == "__main__":

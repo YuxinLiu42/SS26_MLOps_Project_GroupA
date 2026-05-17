@@ -4,6 +4,9 @@ from pathlib import Path
 
 import typer
 from torch.utils.data import Dataset
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MyDataset(Dataset):
