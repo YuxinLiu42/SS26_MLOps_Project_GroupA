@@ -185,8 +185,8 @@ class TestPreprocess:
 
         saved: list[DatasetDict] = []
 
-        def _capture(self: DatasetDict, path: Path) -> None:
-            saved.append(self)
+        def _capture(ds: DatasetDict, path: Path) -> None:
+            saved.append(ds)
 
         with patch.object(DatasetDict, "save_to_disk", _capture):
             result = runner.invoke(
@@ -213,8 +213,8 @@ class TestPreprocess:
 
         saved: list[DatasetDict] = []
 
-        def _capture(self: DatasetDict, path: Path) -> None:
-            saved.append(self)
+        def _capture(ds: DatasetDict, path: Path) -> None:
+            saved.append(ds)
 
         with patch.object(DatasetDict, "save_to_disk", _capture):
             runner.invoke(
@@ -249,8 +249,8 @@ class TestPreprocess:
 
         saved: list[DatasetDict] = []
 
-        def _capture(self: DatasetDict, path: Path) -> None:
-            saved.append(self)
+        def _capture(ds: DatasetDict, path: Path) -> None:
+            saved.append(ds)
 
         with patch.object(DatasetDict, "save_to_disk", _capture):
             result = runner.invoke(
@@ -355,8 +355,8 @@ class TestSubsetData:
 
         saved: list[DatasetDict] = []
 
-        def _capture(self: DatasetDict, path: Path) -> None:
-            saved.append(self)
+        def _capture(ds: DatasetDict, path: Path) -> None:
+            saved.append(ds)
 
         with patch.object(DatasetDict, "save_to_disk", _capture):
             result = runner.invoke(
