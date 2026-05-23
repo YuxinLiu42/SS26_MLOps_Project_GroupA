@@ -5,7 +5,6 @@ import lightning as L
 from transformers import AutoProcessor, PaliGemmaForConditionalGeneration
 import torch
 from rich.logging import RichHandler
-from typing import cast
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,22 +72,19 @@ class PaliGemmaModule(L.LightningModule):
         self.processor = AutoProcessor.from_pretrained(model_name)
 
         log.info("Loading model %s ...", model_name)
-        self.model = cast(
-            PaliGemmaForConditionalGeneration,
-            PaliGemmaForConditionalGeneration.from_pretrained(
-                model_name,
-                torch_dtype=torch_dtype,
-            ),
+        self.model = PaliGemmaForConditionalGeneration.from_pretrained(
+            model_name,
+            torch_dtype=torch_dtype,
         )
 
         if freeze_vision_encoder:
             log.info("Freezing vision encoder parameters.")
-            for param in self.model.vision_tower.parameters():
+            for param in self.model.vision_tower.parameters():  # type: ignore[union-attr]
                 param.requires_grad = False
 
         if freeze_language_model:
             log.info("Freezing language model parameters.")
-            for param in self.model.language_model.parameters():
+            for param in self.model.language_model.parameters():  # type: ignore[union-attr]
                 param.requires_grad = False
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
@@ -143,7 +139,7 @@ class PaliGemmaModule(L.LightningModule):
         pixel_values = batch.get("pixel_values")
         labels = batch["labels"]
 
-        generated_ids = self.model.generate(
+        generated_ids = self.model.generate(  # type: ignore[misc]
             input_ids=input_ids,
             pixel_values=pixel_values,
             max_new_tokens=10,

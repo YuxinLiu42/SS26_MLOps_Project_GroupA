@@ -35,7 +35,7 @@ def sweep_train() -> None:
     dataset = datasets.MNIST("data/raw", train=True, download=True, transform=transform)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True)
 
-    model = PaliGemmaModule(lr=cfg.lr)
+    model = PaliGemmaModule(learning_rate=cfg.lr)
     trainer = L.Trainer(max_epochs=cfg.epochs, enable_checkpointing=False)
     trainer.fit(model, dataloader)
     wandb.finish()
@@ -48,7 +48,7 @@ def train(cfg: DictConfig) -> None:
     dataset = datasets.MNIST("data/raw", train=True, download=True, transform=transform)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True)
 
-    model = PaliGemmaModule(lr=cfg.lr)
+    model = PaliGemmaModule(learning_rate=cfg.lr)
 
     wandb.init(
         project="project_name",
