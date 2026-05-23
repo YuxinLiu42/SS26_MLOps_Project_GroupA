@@ -81,6 +81,7 @@ convention = "google"
 omit = [
     "tests/*",
     "/tmp/*",
+    "*/_remote_module_non_scriptable.py",
 ]
 
 [tool.mypy]
