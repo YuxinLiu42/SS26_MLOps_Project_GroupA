@@ -461,12 +461,14 @@ class TestDataModule:
 
     def test_setup_correct_split_sizes(self, data_module: DataModule) -> None:
         """setup() loads the expected number of samples per split."""
+        assert data_module.dataset is not None
         assert len(data_module.dataset["train"]) == 8
         assert len(data_module.dataset["validation"]) == 2
         assert len(data_module.dataset["test"]) == 4
 
     def test_collate_returns_labels(self, data_module: DataModule) -> None:
         """_collate() output dict contains a 'labels' key."""
+        assert data_module.dataset is not None
         samples = [data_module.dataset["train"][i] for i in range(2)]
 
         with patch("project_name.model.build_prompt", return_value="Q: ..."):
@@ -476,6 +478,7 @@ class TestDataModule:
 
     def test_collate_masks_padding(self, data_module: DataModule) -> None:
         """Padding token positions in labels are replaced with -100."""
+        assert data_module.dataset is not None
         label_ids = torch.tensor([[1, 0, 2], [0, 3, 0]], dtype=torch.long)
         data_module.processor.tokenizer.return_value = {"input_ids": label_ids}
         data_module.processor.tokenizer.pad_token_id = 0
@@ -489,6 +492,7 @@ class TestDataModule:
 
     def test_collate_replaces_missing_image(self, data_module: DataModule) -> None:
         """_collate() replaces None images with a blank RGB placeholder."""
+        assert data_module.dataset is not None
         samples = [data_module.dataset["train"][i] for i in range(2)]
         samples[0] = dict(samples[0], image=None)
 
