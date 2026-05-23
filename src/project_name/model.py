@@ -5,6 +5,7 @@ import lightning as L
 from transformers import AutoProcessor, PaliGemmaForConditionalGeneration
 import torch
 from rich.logging import RichHandler
+from typing import cast
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,11 +73,12 @@ class PaliGemmaModule(L.LightningModule):
         self.processor = AutoProcessor.from_pretrained(model_name)
 
         log.info("Loading model %s ...", model_name)
-        self.model: PaliGemmaForConditionalGeneration = (
+        self.model = cast(
+            PaliGemmaForConditionalGeneration,
             PaliGemmaForConditionalGeneration.from_pretrained(
                 model_name,
                 torch_dtype=torch_dtype,
-            )
+            ),
         )
 
         if freeze_vision_encoder:

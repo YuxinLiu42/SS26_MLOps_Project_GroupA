@@ -11,7 +11,7 @@ from typing import cast
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from project_name.model import Model
+from project_name.model import PaliGemmaModule
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def sweep_train() -> None:
     dataset = datasets.MNIST("data/raw", train=True, download=True, transform=transform)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True)
 
-    model = Model(lr=cfg.lr)
+    model = PaliGemmaModule(lr=cfg.lr)
     trainer = L.Trainer(max_epochs=cfg.epochs, enable_checkpointing=False)
     trainer.fit(model, dataloader)
     wandb.finish()
@@ -48,7 +48,7 @@ def train(cfg: DictConfig) -> None:
     dataset = datasets.MNIST("data/raw", train=True, download=True, transform=transform)
     dataloader = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=True)
 
-    model = Model(lr=cfg.lr)
+    model = PaliGemmaModule(lr=cfg.lr)
 
     wandb.init(
         project="project_name",
