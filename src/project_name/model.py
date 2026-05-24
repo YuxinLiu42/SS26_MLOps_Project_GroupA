@@ -5,6 +5,7 @@ import lightning as L
 from transformers import AutoProcessor, PaliGemmaForConditionalGeneration
 import torch
 from rich.logging import RichHandler
+from peft import get_peft_model, LoraConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +54,9 @@ class PaliGemmaModule(L.LightningModule):
         torch_dtype: Weight dtype. bfloat16 recommended for modern GPUs.
         freeze_vision_encoder: Whether to freeze the SigLIP vision encoder.
         freeze_language_model: Whether to freeze the Gemma language model.
+        gradient_checkpointing: Whether to enable gradient checkpointing
+                                for memory efficiency.
+        use_lora: Whether to apply LoRA fine-tuning to the language model.
     """
 
     def __init__(
@@ -62,6 +66,8 @@ class PaliGemmaModule(L.LightningModule):
         torch_dtype: torch.dtype = torch.bfloat16,
         freeze_vision_encoder: bool = True,
         freeze_language_model: bool = False,
+        gradient_checkpointing: bool = False,
+        use_lora: bool = True,
     ) -> None:
         """Initialize the PaliGemmaModule with model and processor loading."""
         super().__init__()
@@ -79,13 +85,28 @@ class PaliGemmaModule(L.LightningModule):
 
         if freeze_vision_encoder:
             log.info("Freezing vision encoder parameters.")
-            for param in self.model.vision_tower.parameters():  # type: ignore[union-attr]
+            for param in self.model.model.vision_tower.parameters():  # type: ignore[union-attr]
                 param.requires_grad = False
 
         if freeze_language_model:
             log.info("Freezing language model parameters.")
-            for param in self.model.language_model.parameters():  # type: ignore[union-attr]
+            for param in self.model.model.language_model.parameters():  # type: ignore[union-attr]
                 param.requires_grad = False
+
+        if gradient_checkpointing:
+            self.model.gradient_checkpointing_enable(
+                gradient_checkpointing_kwargs={"use_reentrant": False}
+            )
+
+        if use_lora:
+            lora_config = LoraConfig(
+                r=8,
+                lora_alpha=16,
+                target_modules=["q_proj", "v_proj"],
+                lora_dropout=0.05,
+                bias="none",
+            )
+            self.model = get_peft_model(self.model, lora_config)
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         total = sum(p.numel() for p in self.model.parameters())

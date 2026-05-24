@@ -141,7 +141,7 @@ class PredictionLogger(Callback):
         self._rows.clear()
 
 
-@hydra.main(version_base="1.3", config_path="configs", config_name="train")
+@hydra.main(version_base="1.3", config_path="../../configs", config_name="train")
 def train(cfg: DictConfig) -> float:
     """Fine-tune PaliGemma2 on the preprocessed ScienceQA-IMG dataset.
 
@@ -154,7 +154,7 @@ def train(cfg: DictConfig) -> float:
     annealing, gradient clipping, and early stopping on val/loss.
 
     Hydra manages config composition and override from the command line.
-    W&B logging and hyperparameter sweeps are enabled via cfg.wandb.
+    W&B logging and hyperparameter sweeps are enabled via cfg.trainer.wandb.
 
     Args:
         cfg: Hydra DictConfig composed from configs/train.yaml.
@@ -172,6 +172,8 @@ def train(cfg: DictConfig) -> float:
         learning_rate=cfg.model.learning_rate,
         freeze_vision_encoder=cfg.model.freeze_vision_encoder,
         freeze_language_model=cfg.model.freeze_language_model,
+        gradient_checkpointing=cfg.model.gradient_checkpointing,
+        use_lora=cfg.model.use_lora,
     )
 
     log.info(
@@ -189,19 +191,19 @@ def train(cfg: DictConfig) -> float:
     )
 
     logger = None
-    if cfg.wandb.project:
+    if cfg.trainer.wandb.project:
         logger = WandbLogger(
-            project=cfg.wandb.project,
-            name=cfg.wandb.run_name or None,
-            tags=list(cfg.wandb.tags) if cfg.wandb.tags else None,
-            log_model=cfg.wandb.log_model,
+            project=cfg.trainer.wandb.project,
+            name=cfg.trainer.wandb.run_name or None,
+            tags=list(cfg.trainer.wandb.tags) if cfg.trainer.wandb.tags else None,
+            log_model=cfg.trainer.wandb.log_model,
         )
         params = OmegaConf.to_container(cfg, resolve=True)
         logger.log_hyperparams(params)  # type: ignore[arg-type]
         log.info(
             "W&B logging enabled | project=%s, run=%s",
-            cfg.wandb.project,
-            cfg.wandb.run_name,
+            cfg.trainer.wandb.project,
+            cfg.trainer.wandb.run_name,
         )
     callbacks = [
         ModelCheckpoint(
@@ -215,12 +217,12 @@ def train(cfg: DictConfig) -> float:
         ),
         EarlyStopping(
             monitor="val/loss",
-            patience=cfg.trainer.early_stopping_patience,
+            patience=cfg.trainer.patience,
             mode="min",
             verbose=True,
         ),
         LearningRateMonitor(logging_interval="step"),
-        PredictionLogger(n_samples=cfg.wandb.n_prediction_samples),
+        PredictionLogger(n_samples=cfg.trainer.wandb.n_prediction_samples),
     ]
 
     trainer = L.Trainer(
@@ -248,7 +250,8 @@ def train(cfg: DictConfig) -> float:
     trainer.fit(model=model, datamodule=data)
 
     log.info("Training complete. Running test set evaluation with best checkpoint ...")
-    trainer.test(model=model, datamodule=data, ckpt_path="best")
+    ckpt_path = None if cfg.trainer.fast_dev_run else "best"
+    trainer.test(model=model, datamodule=data, ckpt_path=ckpt_path)
     best_val_loss = trainer.checkpoint_callback.best_model_score  # type: ignore[union-attr]
     log.info(
         "Best checkpoint saved at %s | val/loss=%.4f",
@@ -257,7 +260,7 @@ def train(cfg: DictConfig) -> float:
     )
 
     # Return val/loss
-    if cfg.wandb.enabled:
+    if cfg.trainer.wandb.enabled:
         wandb.finish()
 
     return float(best_val_loss)

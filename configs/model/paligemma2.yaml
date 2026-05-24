@@ -8,3 +8,5 @@ model_name: google/paligemma2-3b-pt-224
 learning_rate: 2e-5
 freeze_vision_encoder: true
 freeze_language_model: false
+gradient_checkpointing: true
+use_lora: true

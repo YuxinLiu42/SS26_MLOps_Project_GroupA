@@ -9,6 +9,7 @@ from rich.logging import RichHandler
 import shutil
 import lightning as L
 from PIL import Image
+from project_name.model import build_prompt
 
 logging.basicConfig(
     level=logging.INFO,
@@ -359,7 +360,6 @@ class DataModule(L.LightningDataModule):
             A dict of tensors ready for the model, including 'labels'.
         """
         # Avoid circular import by importing processor here
-        from project_name.model import build_prompt
 
         prompts, answer_texts, images = [], [], []
         for s in samples:
@@ -369,9 +369,10 @@ class DataModule(L.LightningDataModule):
                 s["image"] if s["image"] is not None else Image.new("RGB", (224, 224))
             )
 
-        # Tokenize prompts and process images together
+        prompts_with_image = [f"<image> {p}" for p in prompts]
+
         inputs = self.processor(
-            text=prompts,
+            text=prompts_with_image,
             images=images,
             return_tensors="pt",
             padding="longest",
@@ -379,18 +380,20 @@ class DataModule(L.LightningDataModule):
             max_length=self.max_length,
         )
 
-        # Tokenize answer texts separately to build labels
-        label_encodings = self.processor.tokenizer(
-            answer_texts,
-            return_tensors="pt",
+        labels = inputs["input_ids"].clone()
+
+        prompt_encodings = self.processor.tokenizer(
+            prompts_with_image,
             padding="longest",
             truncation=True,
-            max_length=self.max_label_length,
+            max_length=self.max_length,
         )
+        for i, prompt_ids in enumerate(prompt_encodings["input_ids"]):
+            prompt_len = len(prompt_ids)
+            labels[i, :prompt_len] = -100  # mask prompt
 
-        # Mask padding tokens in labels so they don't contribute to the loss
-        labels = label_encodings["input_ids"].clone()
-        labels[labels == self.processor.tokenizer.pad_token_id] = -100
+        labels[labels == self.processor.tokenizer.pad_token_id] = -100  # mask padding
+
         inputs["labels"] = labels
 
         return dict(inputs)
