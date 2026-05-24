@@ -1,0 +1,12 @@
+# @package data
+#
+# Dataset and DataModule parameters for ScienceQA-IMG.
+# Switch datasets by adding a new file under configs/data/ and passing
+# data=<name> on the command line.
+
+processed_dir: data/processed
+subset: ScienceQA-IMG
+batch_size: 4
+num_workers: 2
+max_length: 256
+max_label_length: 32
