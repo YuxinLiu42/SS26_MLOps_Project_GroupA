@@ -47,17 +47,18 @@ class PredictionLogger(Callback):
 
     def __init__(self, n_samples: int = N_PREDICTION_SAMPLES) -> None:
         """Initialize PredictionLogger with the desired sample count."""
-        super.__init__()
+        super().__init__()
         self.n_samples = n_samples
         self._rows: list[list] = []
 
     def on_test_batch_end(
         self,
         trainer: L.Trainer,
-        pl_module: L.LightningDataModule,
+        pl_module: L.LightningModule,
         outputs,
         batch: dict,
         batch_idx: int,
+        dataloader_idx: int = 0,
     ) -> None:
         """Collect predictions from each test batch until n_samples is reached.
 
@@ -71,6 +72,7 @@ class PredictionLogger(Callback):
             outputs: Return value of test_step (unused).
             batch: Dict of tensors from DataModule._collate.
             batch_idx: Index of the current test batch.
+            dataloader_idx: Index of the dataloader (unused).
         """
         if len(self._rows) >= self.n_samples:
             return
@@ -101,7 +103,7 @@ class PredictionLogger(Callback):
             if len(self._rows) >= self.n_samples:
                 break
             img = (
-                wandb.Image(pixel_values[1].float().cpu())
+                wandb.Image(pixel_values[i].float().cpu())
                 if pixel_values is not None
                 else None
             )
@@ -139,7 +141,7 @@ class PredictionLogger(Callback):
 
 
 @hydra.main(version_base="1.3", config_path="configs", config_name="train")
-def train(cfg: DictConfig) -> None:
+def train(cfg: DictConfig) -> float:
     """Fine-tune PaliGemma2 on the preprocessed ScienceQA-IMG dataset.
 
     Instantiates PaliGemmaModule and DataModule, wires them together via
@@ -193,7 +195,9 @@ def train(cfg: DictConfig) -> None:
             tags=list(cfg.wandb.tags) if cfg.wandb.tags else None,
             log_model=cfg.wandb.log_model,
         )
-        logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
+        params = OmegaConf.to_container(cfg, resolve=True)
+        assert isinstance(params, dict)
+        logger.log_hyperparams(params)
         log.info(
             "W&B logging enabled | project=%s, run=%s",
             cfg.wandb.project,
@@ -219,7 +223,7 @@ def train(cfg: DictConfig) -> None:
         PredictionLogger(n_samples=cfg.wandb.n_prediction_samples),
     ]
 
-    trainer = L.trainer(
+    trainer = L.Trainer(
         max_epochs=cfg.trainer.max_epochs,
         precision=cfg.trainer.precision,  # type: ignore[arg-type]
         accumulate_grad_batches=cfg.trainer.accumulate_grad_batches,
