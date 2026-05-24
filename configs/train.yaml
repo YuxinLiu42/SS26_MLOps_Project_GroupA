@@ -1,3 +1,13 @@
-lr: 1e-3
-epochs: 5
-batch_size: 64
+
+# @package _global_
+#
+# Main entry point. Only declares which config groups to compose.
+# Override any value from the CLI: python train.py model.learning_rate=1e-4
+
+defaults:
+  - data: scienceqa
+  - model: paligemma2
+  - trainer: default
+  - _self_
+
+seed: 42

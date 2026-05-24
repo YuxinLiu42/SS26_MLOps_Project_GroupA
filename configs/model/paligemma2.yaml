@@ -1,0 +1,10 @@
+# @package model
+#
+# Model architecture and optimiser parameters for PaliGemma2-3B.
+# Add a new file under configs/model/ to experiment with a different
+# checkpoint or freezing strategy without touching any code.
+
+model_name: google/paligemma2-3b-pt-224
+learning_rate: 2e-5
+freeze_vision_encoder: true
+freeze_language_model: false

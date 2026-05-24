@@ -1,0 +1,37 @@
+# W&B sweep configuration for hyperparameter search.
+# Usage:
+#   wandb sweep configs/sweep.yaml          # register sweep, get SWEEP_ID
+#   wandb agent <entity>/<project>/SWEEP_ID # launch agent
+
+program: train.py
+method: bayes
+
+metric:
+  name: val/loss
+  goal: minimize
+
+# Each run gets one combination; agent calls train.py with Hydra overrides.
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}   # Hydra expects key=value, not --key value
+
+parameters:
+  model.learning_rate:
+    distribution: log_uniform_values
+    min: 1e-6
+    max: 1e-4
+
+  data.batch_size:
+    values: [2, 4, 8]
+
+  trainer.accumulate_grad_batches:
+    values: [2, 4, 8]
+
+  model.freeze_vision_encoder:
+    values: [true, false]
+
+  # Keep wandb enabled for every sweep run
+  wandb.enabled:
+    value: true
