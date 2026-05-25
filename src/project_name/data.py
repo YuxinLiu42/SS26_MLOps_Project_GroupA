@@ -362,12 +362,14 @@ class DataModule(L.LightningDataModule):
         from project_name.model import build_prompt
 
         prompts, answer_texts, images = [], [], []
+        subjects = []
         for s in samples:
             prompts.append(build_prompt(s["question"], s["choices"]))
             answer_texts.append(s["answer_text"])
             images.append(
                 s["image"] if s["image"] is not None else Image.new("RGB", (224, 224))
             )
+            subjects.append(s.get("subject", "unknown"))
 
         prompts_with_image = [f"<image> {p}" for p in prompts]
 
@@ -395,6 +397,7 @@ class DataModule(L.LightningDataModule):
         labels[labels == self.processor.tokenizer.pad_token_id] = -100  # mask padding
 
         inputs["labels"] = labels
+        inputs["subjects"] = subjects  # for analysis, not used by model
 
         return dict(inputs)
 
