@@ -95,7 +95,7 @@ def predict_single(
     ).to(device)
 
     with torch.inference_mode():
-        output_ids = module.model.generate(
+        output_ids = module.model.generate(  # type: ignore[misc]
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
