@@ -89,6 +89,9 @@ omit = [
     "tests/*",
     "/tmp/*",
     "*/_remote_module_non_scriptable.py",
+    "*/evaluate.py",
+    "*/train.py",
+    "*/visualize.py",
 ]
 
 [tool.mypy]
