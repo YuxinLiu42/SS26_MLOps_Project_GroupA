@@ -1,5 +1,6 @@
 """Training entry point for fine-tuning PaliGemma2 on ScienceQA."""
 
+import os
 import logging
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from lightning.pytorch.callbacks import (
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
 from rich.logging import RichHandler
+from urllib.parse import urlparse
 
 from project_name.data import DataModule
 from project_name.model import PaliGemmaModule
@@ -148,6 +150,26 @@ class PredictionLogger(Callback):
         self._rows.clear()
 
 
+def upload_to_gcs(local_path: Path, gcs_dir: str) -> str:
+    """Upload a local file to a gs:// directory.
+
+    Args:
+        local_path: Path to the local file to upload.
+        gcs_dir: Destination directory as a gs://bucket/prefix URI.
+
+    Returns:
+        The full gs:// URI of the uploaded object.
+    """
+    from google.cloud import storage
+
+    parsed = urlparse(gcs_dir)
+    blob_name = f"{parsed.path.lstrip('/')}/{local_path.name}".lstrip("/")
+    client = storage.Client()
+    blob = client.bucket(parsed.netloc).blob(blob_name)
+    blob.upload_from_filename(str(local_path))
+    return f"gs://{parsed.netloc}/{blob_name}"
+
+
 @hydra.main(version_base="1.3", config_path=_CONFIGS_DIR, config_name="train")
 def train(cfg: DictConfig) -> float:
     """Fine-tune PaliGemma2 on the preprocessed ScienceQA-IMG dataset.
@@ -264,11 +286,16 @@ def train(cfg: DictConfig) -> float:
         return 0.0
 
     best_val_loss = trainer.checkpoint_callback.best_model_score  # type: ignore[union-attr]
+    best_ckpt = trainer.checkpoint_callback.best_model_path  # type: ignore[union-attr]
     log.info(
         "Best checkpoint saved at %s | val/loss=%.4f",
-        trainer.checkpoint_callback.best_model_path,  # type: ignore[union-attr]
+        best_ckpt,
         best_val_loss,
     )
+    model_dir = os.environ.get("AIP_MODEL_DIR")
+    if model_dir and best_ckpt:
+        uri = upload_to_gcs(Path(best_ckpt), model_dir)
+        log.info("Uploaded best checkpoint to %s", uri)
 
     # Return val/loss
     if cfg.trainer.wandb.enabled:

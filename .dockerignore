@@ -1,0 +1,11 @@
+.dvc/cache
+data/**
+!data/**/*.dvc
+!data/**/.gitignore
+.venv
+__pycache__
+*.pyc
+wandb
+lightning_logs
+checkpoints
+outputs
