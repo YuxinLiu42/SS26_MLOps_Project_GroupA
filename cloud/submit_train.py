@@ -13,8 +13,8 @@ logger = logging.getLogger("submit_train")
 
 # GCP / project configuration
 PROJECT_ID = "paligemma-scienceqa"
-LOCATION = "europe-west3"
-BUCKET = "mlops_paligemma"
+LOCATION = "europe-west4"
+BUCKET = "mlops-paligemma-west4"
 REPO = "mlops-images"
 IMAGE_NAME = "paligemma-train"
 IMAGE_TAG = "latest"

@@ -186,3 +186,4 @@ profile_output.prof
 eval_results.json
 make_tiny_ckpt.py
 /tiny-paligemma/
+cloud/vertex_config.yaml

@@ -116,6 +116,7 @@ class PaliGemmaModule(L.LightningModule):
             self.model.gradient_checkpointing_enable(
                 gradient_checkpointing_kwargs={"use_reentrant": False}
             )
+            self.model.enable_input_require_grads()  # type: ignore[union-attr]
 
         if use_lora:
             lora_config = LoraConfig(
@@ -128,10 +129,28 @@ class PaliGemmaModule(L.LightningModule):
             )
             self.model = get_peft_model(self.model, lora_config)  # type: ignore[assignment]
 
+            # log case and adapter shape of every module LoRA actually wrapped
+            for name, module in self.model.named_modules():
+                if not hasattr(module, "lora_A"):
+                    continue
+                lora_a = module.lora_A  # type: ignore[attr-defined]
+                if len(lora_a) == 0:
+                    continue
+                adapter = next(iter(lora_a))
+                base = module.base_layer  # type: ignore[attr-defined]
+                log.info(
+                    "LoRA: %s | base %d→%d | A %s | B %s",
+                    name,
+                    base.in_features,
+                    base.out_features,
+                    tuple(lora_a[adapter].weight.shape),
+                    tuple(module.lora_B[adapter].weight.shape),  # type: ignore[attr-defined]
+                )
+
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         total = sum(p.numel() for p in self.model.parameters())
         log.info(
-            "Trainable parameters: %.1fM / %.1fM total.",
+            "Trai nable parameters: %.1fM / %.1fM total.",
             trainable / 1e6,
             total / 1e6,
         )
