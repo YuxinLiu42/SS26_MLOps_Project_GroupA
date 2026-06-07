@@ -86,8 +86,10 @@ def predict_single(
     built_prompt = build_prompt(question, choices, **prompt_kwargs)
     device = next(module.parameters()).device
 
+    # Must match training (DataModule._collate prepends "<image> "); otherwise the
+    # prompt format differs from what the model saw during fine-tuning.
     inputs = module.processor(
-        text=built_prompt,
+        text=f"<image> {built_prompt}",
         images=image,
         return_tensors="pt",
     ).to(device)
