@@ -127,7 +127,8 @@ class PaliGemmaModule(L.LightningModule):
         if use_lora:
             if not lora_target_modules:
                 raise ValueError(
-                    "lora_target_modules must contain at least one module name when use_lora=True."
+                    "lora_target_modules must contain "
+                    "at least one module name when use_lora=True."
                 )
             # Match the chosen projection layers of the language model only
             # (vision tower stays frozen). Regex is anchored so it never wraps
