@@ -1,6 +1,18 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+default_install_hook_types: [pre-commit, commit-msg]
 repos:
+  - repo: local
+    hooks:
+      - id: no-ai-coauthor
+        name: block AI co-author trailers in commit messages
+        language: system
+        entry: >-
+          bash -c 'if grep -iqE "co-authored-by:.*(claude|anthropic|copilot|chatgpt|openai)" "$1";
+          then echo "ERROR - AI co-author trailer in the commit message. Remove it
+          (it adds the AI as a GitHub contributor)."; exit 1; fi' --
+        stages: [commit-msg]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
