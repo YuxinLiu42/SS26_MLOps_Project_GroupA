@@ -186,6 +186,10 @@ profile_output.prof
 eval_results.json
 make_tiny_ckpt.py
 /tiny-paligemma/
+# rendered per-submit job configs (generated; no secrets since the Secret
+# Manager move — watch_job.sh is intentionally TRACKED for the same reason)
 cloud/vertex_config.yaml
-cloud/watch_job.sh
+cloud/vertex_eval.yaml
+# runtime model outputs
+/models/
 .claude/
