@@ -43,7 +43,7 @@ def _fetch_gcs_dir(uri: str) -> Path:
     Raises:
         FileNotFoundError: If no objects exist under the prefix.
     """
-    from google.cloud import storage
+    from google.cloud import storage  # type: ignore[attr-defined]
 
     parsed = urlparse(uri)
     prefix = parsed.path.lstrip("/").rstrip("/") + "/"
