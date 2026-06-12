@@ -1,5 +1,6 @@
 """Training entry point for fine-tuning PaliGemma2 on ScienceQA."""
 
+import math
 import os
 import logging
 from pathlib import Path
@@ -197,6 +198,92 @@ def upload_dir_to_gcs(local_dir: Path, gcs_dir: str) -> str:
     return f"gs://{parsed.netloc}/{prefix}"
 
 
+def log_adapter_artifact(
+    logger: WandbLogger,
+    adapter_dir: Path,
+    run_tag: str,
+    cfg: DictConfig,
+    trainer: L.Trainer,
+    best_val_acc: float,
+) -> None:
+    """Version the run's LoRA adapter as a W&B artifact (model registry).
+
+    Every run logs a new version of the same artifact lineage
+    ('scienceqa-paligemma2-lora'), tagged with a per-run alias. Promotion is a
+    separate step: it adds the `production` alias to the chosen version and
+    copies the adapter to the stable GCS serving path — serving reads GCS,
+    never W&B (no W&B key in the API container).
+
+    Args:
+        logger: Active WandbLogger whose run logs the artifact.
+        adapter_dir: Directory written by save_adapter.
+        run_tag: W&B run name used to tag this version.
+        cfg: Resolved Hydra config (hyperparams recorded in metadata).
+        trainer: Trainer after fit/test; provides test/accuracy if available.
+        best_val_acc: Best val/accuracy from the checkpoint callback.
+    """
+    test_acc = trainer.callback_metrics.get("test/accuracy")
+    artifact = wandb.Artifact(
+        "scienceqa-paligemma2-lora",
+        type="model",
+        metadata={
+            "run_name": run_tag,
+            "val_accuracy": float(best_val_acc),
+            "test_accuracy": float(test_acc) if test_acc is not None else None,
+            "learning_rate": float(cfg.model.learning_rate),
+            "effective_batch": int(
+                cfg.data.batch_size * cfg.trainer.accumulate_grad_batches
+            ),
+        },
+    )
+    artifact.add_dir(str(adapter_dir))
+    logger.experiment.log_artifact(artifact, aliases=[f"run-{run_tag}"])
+    log.info("Logged W&B adapter artifact version (alias run-%s)", run_tag)
+
+
+def resolve_learning_rate(cfg: DictConfig) -> float:
+    """Resolve the learning rate, applying the sqrt batch-size rule if needed.
+
+    An explicit model.learning_rate always wins (scaling bypassed). Otherwise
+    the lr is derived from model.base_learning_rate — defined at
+    model.reference_effective_batch — via lr = base * sqrt(eff_batch / ref).
+    This keeps a swept base_learning_rate comparable across effective batch
+    sizes, so the sweep's LR and accumulation dimensions stay decoupled.
+
+    Args:
+        cfg: Composed Hydra config with model/data/trainer groups.
+
+    Returns:
+        The learning rate to train with.
+
+    Raises:
+        ValueError: If neither model.learning_rate nor model.base_learning_rate
+            is set.
+    """
+    if cfg.model.learning_rate is not None:
+        log.info(
+            "Explicit model.learning_rate=%.3e set; sqrt scaling bypassed.",
+            cfg.model.learning_rate,
+        )
+        return float(cfg.model.learning_rate)
+    if cfg.model.base_learning_rate is None:
+        raise ValueError(
+            "Set model.learning_rate or model.base_learning_rate in the config."
+        )
+    eff_batch = cfg.data.batch_size * cfg.trainer.accumulate_grad_batches
+    lr = cfg.model.base_learning_rate * math.sqrt(
+        eff_batch / cfg.model.reference_effective_batch
+    )
+    log.info(
+        "Derived lr %.3e from base_lr %.3e (sqrt scaling, eff_batch %d, ref %d)",
+        lr,
+        cfg.model.base_learning_rate,
+        eff_batch,
+        cfg.model.reference_effective_batch,
+    )
+    return float(lr)
+
+
 @hydra.main(version_base="1.3", config_path=_CONFIGS_DIR, config_name="train")
 def train(cfg: DictConfig) -> float:
     """Fine-tune PaliGemma2 on the preprocessed ScienceQA-IMG dataset.
@@ -207,7 +294,7 @@ def train(cfg: DictConfig) -> float:
 
     The vision encoder is frozen by default since ScienceQA images do not
     require visual feature adaptation. Training uses AdamW with cosine
-    annealing, gradient clipping, and early stopping on val/loss.
+    annealing, gradient clipping, and early stopping on val/accuracy.
 
     Hydra manages config composition and override from the command line.
     W&B logging and hyperparameter sweeps are enabled via cfg.trainer.wandb.
@@ -216,11 +303,16 @@ def train(cfg: DictConfig) -> float:
         cfg: Hydra DictConfig composed from configs/train.yaml.
 
     Returns:
-        Final val/loss value, used by W&B sweep agent as the optimisation target.
+        Best val/accuracy, the metric the W&B sweep optimises (the agent reads
+        it from the logged run history).
     """
     log.info("Resolved config:\n%s", OmegaConf.to_yaml(cfg))
 
     L.seed_everything(cfg.seed, workers=True)
+
+    # Resolve before model init so the derived value reaches both the module
+    # hparams and the W&B-logged config.
+    cfg.model.learning_rate = resolve_learning_rate(cfg)
 
     log.info("Initializing model from %s ...", cfg.model.model_name)
     model = PaliGemmaModule(
@@ -268,21 +360,23 @@ def train(cfg: DictConfig) -> float:
     callbacks = [
         ModelCheckpoint(
             dirpath=cfg.trainer.ckpt_dir,
-            # auto_insert_metric_name=False so the "val/loss" metric's slash is
-            # NOT inserted literally (which made Lightning create a 'val/' subdir
-            # and mangled the uploaded path to '.../model//loss=...ckpt').
-            filename="paligemma2-ep{epoch:02d}-vl{val/loss:.4f}",
+            # auto_insert_metric_name=False so the "val/accuracy" metric's slash
+            # is NOT inserted literally (which made Lightning create a 'val/'
+            # subdir and mangled the uploaded path to '.../model//...ckpt').
+            filename="paligemma2-ep{epoch:02d}-va{val/accuracy:.4f}",
             auto_insert_metric_name=False,
-            monitor="val/loss",
-            mode="min",
+            # Select by ACCURACY, not val/loss: sweep #1 showed they disagree
+            # (the best-val/loss trial scored 3 pts below baseline on test).
+            monitor="val/accuracy",
+            mode="max",
             save_top_k=1,  # full Lightning ckpt is ~6GB; keep just the best
             save_last=False,
             verbose=True,
         ),
         EarlyStopping(
-            monitor="val/loss",
+            monitor="val/accuracy",
             patience=cfg.trainer.patience,
-            mode="min",
+            mode="max",
             verbose=True,
         ),
         LearningRateMonitor(logging_interval="step"),
@@ -320,12 +414,12 @@ def train(cfg: DictConfig) -> float:
         log.info("fast_dev_run complete — skipping checkpoint summary.")
         return 0.0
 
-    best_val_loss = trainer.checkpoint_callback.best_model_score  # type: ignore[union-attr]
+    best_val_acc = trainer.checkpoint_callback.best_model_score  # type: ignore[union-attr]
     best_ckpt = trainer.checkpoint_callback.best_model_path  # type: ignore[union-attr]
     log.info(
-        "Best checkpoint saved at %s | val/loss=%.4f",
+        "Best checkpoint saved at %s | val/accuracy=%.4f",
         best_ckpt,
-        best_val_loss,
+        best_val_acc,
     )
 
     # Export ONLY the LoRA adapter (a few MB) for the registry / serving — NOT
@@ -342,6 +436,10 @@ def train(cfg: DictConfig) -> float:
     adapter_dir = Path(cfg.trainer.ckpt_dir) / f"adapter-{run_tag}"
     if cfg.model.use_lora:
         model.save_adapter(adapter_dir)
+        if logger is not None:
+            log_adapter_artifact(
+                logger, adapter_dir, run_tag, cfg, trainer, best_val_acc
+            )
         model_dir = os.environ.get("AIP_MODEL_DIR")
         if model_dir:
             uri = upload_dir_to_gcs(adapter_dir, model_dir)
@@ -353,11 +451,10 @@ def train(cfg: DictConfig) -> float:
             uri = upload_to_gcs(Path(best_ckpt), model_dir)
             log.info("Uploaded full checkpoint to %s", uri)
 
-    # Return val/loss
     if cfg.trainer.wandb.enabled:
         wandb.finish()
 
-    return float(best_val_loss)
+    return float(best_val_acc)
 
 
 if __name__ == "__main__":

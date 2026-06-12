@@ -527,11 +527,37 @@ class TestDataModule:
         assert dl.batch_size == data_module.batch_size
         assert isinstance(dl.sampler, RandomSampler)
 
+    def test_collate_val_carries_generation_inputs(
+        self, data_module: DataModule
+    ) -> None:
+        """_collate_val() attaches gen_* encodings and answer_texts.
+
+        The supervised tensors (labels) feed val/loss; the answer-free gen_*
+        encodings feed val/accuracy generation; answer_texts carries the
+        ground-truth letters derived from the `answer` index.
+        """
+        assert data_module.dataset is not None
+        samples = [data_module.dataset["validation"][i] for i in range(2)]
+
+        with patch("project_name.model.build_prompt", return_value="Q: ..."):
+            batch = data_module._collate_val(samples)
+
+        assert "labels" in batch
+        assert "gen_input_ids" in batch
+        assert "gen_attention_mask" in batch
+        assert batch["answer_texts"] == ["A", "A"]
+
     def test_val_dataloader_no_shuffle(self, data_module: DataModule) -> None:
         """val_dataloader is configured with shuffle=False."""
         dl = data_module.val_dataloader()
 
         assert isinstance(dl.sampler, SequentialSampler)
+
+    def test_val_dataloader_uses_val_collate(self, data_module: DataModule) -> None:
+        """val_dataloader must collate with _collate_val (loss + generation)."""
+        dl = data_module.val_dataloader()
+
+        assert dl.collate_fn == data_module._collate_val
 
     def test_test_dataloader_no_shuffle(self, data_module: DataModule) -> None:
         """test_dataloader is configured with shuffle=False."""

@@ -8,9 +8,13 @@ workerPoolSpecs:
       bootDiskType: pd-ssd
       bootDiskSizeGb: 300
     containerSpec:
-      imageUri: europe-west4-docker.pkg.dev/paligemma-scienceqa/mlops-images/paligemma-train:latest
+      # Pinned to a DIGEST at submit time by watch_job.sh. Vertex resolves a
+      # ':latest' tag at container START — after a long Flex Start queue the
+      # image could silently change between submit and run.
+      imageUri: ${IMAGE_URI}
       # One GPU acquisition runs the baseline AND the sweep (see the script):
-      # dvc pull -> CUDA check -> baseline fine-tune -> N-trial W&B sweep.
+      # dvc pull -> CUDA check -> baseline fine-tune -> N-trial W&B sweep
+      # -> by-subject eval of the sweep's best adapter.
       command: ["/bin/bash", "cloud/run_baseline_and_sweep.sh"]
       args:
         - data.batch_size=4
@@ -18,9 +22,18 @@ workerPoolSpecs:
       env:
         - name: SWEEP_COUNT
           value: "8"
-        - name: WANDB_API_KEY
-          value: ${WANDB_API_KEY}
-        - name: HF_TOKEN
-          value: ${HF_TOKEN}
+        - name: SKIP_BASELINE
+          value: "${SKIP_BASELINE}"
+        - name: SWEEP_ID
+          value: "${SWEEP_ID}"
+        # Secret NAMES only — the container fetches the values from Secret
+        # Manager at startup (run_baseline_and_sweep.sh), so the job spec
+        # never carries plaintext keys.
+        - name: GCP_PROJECT
+          value: paligemma-scienceqa
+        - name: WANDB_SECRET_NAME
+          value: wandb-api-key
+        - name: HF_SECRET_NAME
+          value: hf-token
 baseOutputDirectory:
   outputUriPrefix: gs://mlops-paligemma-west4/vertex-output/paligemma-lora

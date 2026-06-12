@@ -4,8 +4,10 @@ import base64
 import io
 import logging
 import os
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException
 from PIL import Image
@@ -25,15 +27,53 @@ log = logging.getLogger(__name__)
 _module: PaliGemmaModule | None = None
 
 
+def _fetch_gcs_dir(uri: str) -> Path:
+    """Download a GCS directory (e.g. the production adapter) to a temp dir.
+
+    Lets the serving container start from the stable GCS path
+    (gs://mlops-paligemma-west4/models/production) instead of baking the
+    adapter into the image — promotion then needs no rebuild/redeploy.
+
+    Args:
+        uri: gs://bucket/prefix directory holding the adapter files.
+
+    Returns:
+        Local directory containing the downloaded files.
+
+    Raises:
+        FileNotFoundError: If no objects exist under the prefix.
+    """
+    from google.cloud import storage
+
+    parsed = urlparse(uri)
+    prefix = parsed.path.lstrip("/").rstrip("/") + "/"
+    dest_root = Path(tempfile.mkdtemp(prefix="adapter-"))
+    client = storage.Client()
+    count = 0
+    for blob in client.list_blobs(parsed.netloc, prefix=prefix):
+        rel = blob.name[len(prefix) :]
+        if not rel:
+            continue
+        dest = dest_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        blob.download_to_filename(str(dest))
+        count += 1
+    if not count:
+        raise FileNotFoundError(f"No objects found under {uri}")
+    log.info("Fetched %d adapter files from %s", count, uri)
+    return dest_root
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load the PaliGemma2 checkpoint on startup and release it on shutdown.
 
     The model path is resolved from the environment variable ``CHECKPOINT_PATH``
-    and may be either a LoRA adapter directory or a full .ckpt file. If the
-    variable is not set, or the path does not exist, the service starts without
-    a loaded model and every /predict call will return 503 until the service is
-    restarted with a valid path.
+    and may be a LoRA adapter directory, a full .ckpt file, or a gs:// directory
+    (downloaded to a temp dir first). If the variable is not set, or the path
+    does not exist, the service starts without a loaded model and every
+    /predict call will return 503 until the service is restarted with a valid
+    path.
 
     Args:
         app: The FastAPI application instance (required by the lifespan protocol).
@@ -41,7 +81,11 @@ async def lifespan(app: FastAPI):
     global _module
     checkpoint_env = os.environ.get("CHECKPOINT_PATH", "")
     if checkpoint_env:
-        checkpoint_path = Path(checkpoint_env)
+        if checkpoint_env.startswith("gs://"):
+            log.info("CHECKPOINT_PATH is a GCS uri — downloading %s", checkpoint_env)
+            checkpoint_path = _fetch_gcs_dir(checkpoint_env)
+        else:
+            checkpoint_path = Path(checkpoint_env)
         if checkpoint_path.exists():
             log.info("Loading model from %s ...", checkpoint_path)
             _module = load_model(checkpoint_path)

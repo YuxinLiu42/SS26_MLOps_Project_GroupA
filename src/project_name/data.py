@@ -340,21 +340,22 @@ class DataModule(L.LightningDataModule):
     def _collate(self, samples: list[dict], for_train: bool = True) -> dict:
         """Collate a batch of samples into model-ready tensors.
 
-        Train/val (for_train=True): the answer is passed to the processor as
+        Supervised (for_train=True): the answer is passed to the processor as
         ``suffix=``. PaliGemma then builds ``labels`` with the image+prompt
         prefix and padding masked to -100, so cross-entropy is computed ONLY on
         the answer tokens (the correct seq2seq objective). Previously the answer
         was never added and the mask was index-misaligned, so the loss sat at
         ~ln(vocab) (random) and the model could not learn.
 
-        Test (for_train=False): no answer is placed in the input, so the model
-        must generate it; the ground-truth answer letters are attached as
+        Generation (for_train=False): no answer is placed in the input, so the
+        model must generate it; the ground-truth answer letters are attached as
         ``answer_texts`` for exact-match scoring in test_step / evaluate.
+        Validation batches combine both modes via _collate_val.
 
         Args:
             samples: List of dataset samples with 'question', 'choices',
                      'answer', and 'image'.
-            for_train: Build supervised labels via suffix (train/val) or a
+            for_train: Build supervised labels via suffix (train) or a
                        generation-only batch (test).
 
         Returns:
@@ -418,12 +419,36 @@ class DataModule(L.LightningDataModule):
         return dict(inputs)
 
     def _collate_train(self, samples: list[dict]) -> dict:
-        """Collate for train/val: supervised labels via the answer suffix."""
+        """Collate for train: supervised labels via the answer suffix."""
         return self._collate(samples, for_train=True)
 
     def _collate_eval(self, samples: list[dict]) -> dict:
         """Collate for test: generation-only input + answer labels for scoring."""
         return self._collate(samples, for_train=False)
+
+    def _collate_val(self, samples: list[dict]) -> dict:
+        """Collate for val: supervised labels plus answer-free generation inputs.
+
+        val/loss needs the suffix-supervised tensors, while val/accuracy must
+        generate from inputs WITHOUT the answer — generating from the
+        supervised input_ids would leak it into the prompt. The generation
+        encoding rides along under gen_* keys; pixel_values are shared since
+        both encodings see the same images. Running the processor twice per
+        batch is negligible for the ~420-sample val split.
+
+        Args:
+            samples: List of dataset samples (see _collate).
+
+        Returns:
+            The supervised batch plus gen_input_ids, gen_attention_mask, and
+            the answer_texts ground-truth letters for exact-match scoring.
+        """
+        batch = self._collate(samples, for_train=True)
+        gen = self._collate(samples, for_train=False)
+        batch["gen_input_ids"] = gen["input_ids"]
+        batch["gen_attention_mask"] = gen["attention_mask"]
+        batch["answer_texts"] = gen["answer_texts"]
+        return batch
 
     def train_dataloader(self) -> DataLoader:
         """Return the DataLoader for the training split.
@@ -443,6 +468,10 @@ class DataModule(L.LightningDataModule):
     def val_dataloader(self) -> DataLoader:
         """Return the DataLoader for the validation split.
 
+        Uses _collate_val so each batch carries both the supervised tensors
+        (for val/loss) and the answer-free generation inputs (for
+        val/accuracy).
+
         Returns:
             DataLoader without shuffling for deterministic evaluation.
         """
@@ -452,7 +481,7 @@ class DataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=self._collate_train,
+            collate_fn=self._collate_val,
         )
 
     def test_dataloader(self) -> DataLoader:

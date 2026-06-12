@@ -15,8 +15,10 @@
 .env.*
 *.env
 .dvc/config.local
-# rendered by envsubst, holds the real WANDB_API_KEY / HF_TOKEN:
+# rendered by envsubst (no secrets since the Secret Manager move, but they
+# are per-submit artifacts that don't belong in the image):
 cloud/vertex_config.yaml
+cloud/vertex_eval.yaml
 
 # DVC-tracked data: ship only the .dvc pointers, not the real data.
 # .gitignore used to hide these dirs, but it's disabled now that this file exists.
@@ -47,6 +49,16 @@ wandb
 lightning_logs
 checkpoints
 outputs
+
+# not COPY'd by any dockerfile — pure upload waste (tiny-paligemma alone is
+# ~100MB and, being iCloud-evicted, broke the gcloud tarball with
+# "unexpected end of data")
+tiny-paligemma/
+models/
+tests/
+reports/
+profile_output.prof
+import_time.log
 
 # vcs / local tooling / os
 .git

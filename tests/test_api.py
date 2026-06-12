@@ -66,6 +66,33 @@ def test_predict_without_model_returns_503() -> None:
     assert response.status_code == 503
 
 
+def test_lifespan_fetches_gcs_checkpoint(monkeypatch, tmp_path) -> None:
+    """A gs:// CHECKPOINT_PATH is downloaded via _fetch_gcs_dir, then loaded."""
+    monkeypatch.setenv("CHECKPOINT_PATH", "gs://bucket/models/production")
+    with (
+        patch("project_name.api._fetch_gcs_dir", return_value=tmp_path) as mock_fetch,
+        patch("project_name.api.load_model") as mock_load,
+    ):
+        with TestClient(app) as client:
+            response = client.get("/")
+        mock_fetch.assert_called_once_with("gs://bucket/models/production")
+        mock_load.assert_called_once_with(tmp_path)
+    assert response.json()["model_loaded"] == "True"
+
+
+def test_lifespan_local_path_skips_gcs_fetch(monkeypatch, tmp_path) -> None:
+    """A local CHECKPOINT_PATH never touches GCS."""
+    monkeypatch.setenv("CHECKPOINT_PATH", str(tmp_path))
+    with (
+        patch("project_name.api._fetch_gcs_dir") as mock_fetch,
+        patch("project_name.api.load_model") as mock_load,
+    ):
+        with TestClient(app):
+            pass
+        mock_fetch.assert_not_called()
+        mock_load.assert_called_once()
+
+
 def test_predict_returns_prediction() -> None:
     """Predict endpoint returns a prediction letter when model is loaded."""
     with (

@@ -1,6 +1,7 @@
 """Running single-sample predictions with a fine-tuned PaliGemma2 model."""
 
 import logging
+import os
 from pathlib import Path
 
 import torch
@@ -70,11 +71,15 @@ def load_model(
 
     Args:
         path: Adapter directory or .ckpt file.
-        device: Target device. Auto-detected if None.
+        device: Target device. If None, the PREDICT_DEVICE env var wins (e.g.
+            "cpu" — needed on Apple Silicon, where the auto-picked MPS backend
+            crashes compiling PaliGemma matmul shapes); otherwise auto-detected.
 
     Returns:
         PaliGemmaModule in eval mode on the target device.
     """
+    if device is None and (env_device := os.environ.get("PREDICT_DEVICE")):
+        device = torch.device(env_device)
     if Path(path).is_dir():
         return PaliGemmaModule.load_adapter(path, device=device)
     return load_checkpoint(path, device=device)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from google.cloud import aiplatform
 from rich.logging import RichHandler
@@ -24,8 +23,13 @@ MACHINE_TYPE = "g2-standard-8"
 ACCELERATOR_TYPE = "NVIDIA_L4"
 ACCELERATOR_COUNT = 1
 
-# Secrets expected in the local shell environment.
-REQUIRED_SECRETS = ("WANDB_API_KEY", "HF_TOKEN")
+# Secret NAMES only — the container resolves the values from Secret Manager
+# at startup (cloud/fetch_secrets.sh), so the job spec never carries keys.
+SECRET_ENV = [
+    {"name": "GCP_PROJECT", "value": PROJECT_ID},
+    {"name": "WANDB_SECRET_NAME", "value": "wandb-api-key"},
+    {"name": "HF_SECRET_NAME", "value": "hf-token"},
+]
 
 
 def build_image_uri() -> str:
@@ -38,27 +42,9 @@ def build_image_uri() -> str:
     return f"{registry}/{PROJECT_ID}/{REPO}/{IMAGE_NAME}:{IMAGE_TAG}"
 
 
-def collect_secret_env() -> list[dict[str, str]]:
-    """Read required secrets from the environment for container injection.
-
-    Returns:
-        A list of {"name", "value"} dicts in the format Vertex expects.
-
-    Raises:
-        SystemExit: If any required secret is missing from the environment.
-    """
-    missing = [k for k in REQUIRED_SECRETS if not os.environ.get(k)]
-    if missing:
-        logger.error("Missing required environment variables: %s", ", ".join(missing))
-        logger.error("Export them first, e.g. `export WANDB_API_KEY=...`")
-        raise SystemExit(1)
-    return [{"name": k, "value": os.environ[k]} for k in REQUIRED_SECRETS]
-
-
 def main() -> None:
     """Configure and submit the custom training job."""
     image_uri = build_image_uri()
-    env = collect_secret_env()
 
     aiplatform.init(
         project=PROJECT_ID,
@@ -76,7 +62,7 @@ def main() -> None:
             "replica_count": 1,
             "container_spec": {
                 "image_uri": image_uri,
-                "env": env,
+                "env": SECRET_ENV,
             },
         }
     ]

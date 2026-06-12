@@ -1,0 +1,37 @@
+# Standalone evaluation job: run evaluate.py --by-subject against an adapter
+# in GCS (no training). Submit via watch_job.sh:
+#   TEMPLATE=cloud/vertex_eval.template.yaml RENDERED=cloud/vertex_eval.yaml \
+#   DISPLAY_NAME=paligemma-eval \
+#   ADAPTER_GCS=gs://mlops-paligemma-west4/models/production \
+#   bash cloud/watch_job.sh
+#
+# NOTE: this queues for the same scarce europe-west4 L4 pool as training jobs
+# — avoid submitting while a training/sweep job is still QUEUED, or the two
+# compete for capacity.
+workerPoolSpecs:
+  - machineSpec:
+      machineType: g2-standard-8        # 8 vCPU / 32GB / 1×L4
+      acceleratorType: NVIDIA_L4
+      acceleratorCount: 1
+    replicaCount: 1
+    diskSpec:
+      bootDiskType: pd-ssd
+      bootDiskSizeGb: 300
+    containerSpec:
+      # Pinned to a DIGEST at submit time by watch_job.sh (Vertex resolves a
+      # ':latest' tag at container START, not at submit).
+      imageUri: ${IMAGE_URI}
+      command: ["/bin/bash", "cloud/run_eval.sh"]
+      env:
+        - name: ADAPTER_GCS
+          value: "${ADAPTER_GCS}"
+        # Secret NAMES only — the container fetches the values from Secret
+        # Manager at startup (cloud/fetch_secrets.sh).
+        - name: GCP_PROJECT
+          value: paligemma-scienceqa
+        - name: WANDB_SECRET_NAME
+          value: wandb-api-key
+        - name: HF_SECRET_NAME
+          value: hf-token
+baseOutputDirectory:
+  outputUriPrefix: gs://mlops-paligemma-west4/vertex-output/paligemma-eval

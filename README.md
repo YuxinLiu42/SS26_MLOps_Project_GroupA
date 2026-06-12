@@ -72,3 +72,27 @@ a [cookiecutter template](https://github.com/cookiecutter/cookiecutter) for gett
 started with Machine Learning Operations (MLOps).
 
 ````
+
+## Serving
+
+The FastAPI service (`src/project_name/api.py`, image: `dockerfiles/api.dockerfile`)
+serves single-sample ScienceQA predictions from the **production adapter**.
+
+`CHECKPOINT_PATH` accepts a local adapter dir, a `.ckpt` file, or a `gs://` directory —
+the stable production path is fetched at startup, so promoting a new adapter
+(copy to GCS + W&B `production` alias) requires **no rebuild or redeploy**:
+
+```bash
+# local (model weights cached from HF; needs HF access for the gated base model)
+CHECKPOINT_PATH=gs://mlops-paligemma-west4/models/production \
+  uvicorn project_name.api:app --host 0.0.0.0 --port 8000
+```
+
+**Deployment decision (2026-06-12):** demo-grade serving runs locally or as a
+container on demand, NOT as an always-on cloud endpoint. Rationale: PaliGemma2-3B
+needs a GPU for interactive latency; an always-on L4 endpoint (Vertex endpoint or
+Cloud Run w/ GPU) costs more than this course project justifies, and Cloud Run CPU
+inference (~minutes/request) times out for real use. The `gs://` startup fetch
+keeps the container cloud-ready: `gcloud run deploy --image <api image>
+--set-env-vars CHECKPOINT_PATH=gs://mlops-paligemma-west4/models/production`
+is the documented path if an always-on endpoint is ever needed.

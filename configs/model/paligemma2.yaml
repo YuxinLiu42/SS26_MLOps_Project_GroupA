@@ -5,7 +5,13 @@
 # checkpoint or freezing strategy without touching any code.
 
 model_name: google/paligemma2-3b-pt-224
-learning_rate: 1e-4
+# Learning rate: leave learning_rate null to derive it at runtime via the sqrt
+# batch-size rule lr = base_learning_rate * sqrt(eff_batch / ref_eff_batch),
+# so a swept base_learning_rate stays comparable across effective batch sizes.
+# Set learning_rate explicitly to bypass the scaling.
+learning_rate: null
+base_learning_rate: 1.0e-4        # the 58.85% baseline lr, defined at eff. batch 16
+reference_effective_batch: 16
 freeze_vision_encoder: true
 freeze_language_model: false
 gradient_checkpointing: true

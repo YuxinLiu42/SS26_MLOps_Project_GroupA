@@ -35,6 +35,21 @@ def test_load_checkpoint_auto_selects_cpu() -> None:
     assert module is fake_module
 
 
+def test_load_model_honors_predict_device_env(monkeypatch) -> None:
+    """PREDICT_DEVICE env forces the device when none is passed explicitly."""
+    from project_name.predict import load_model
+
+    monkeypatch.setenv("PREDICT_DEVICE", "cpu")
+    fake_module = MagicMock()
+    with patch(
+        "project_name.predict.load_checkpoint", return_value=fake_module
+    ) as mock_load:
+        load_model(Path("fake.ckpt"))
+
+    _, kwargs = mock_load.call_args
+    assert kwargs["device"] == torch.device("cpu")
+
+
 def test_load_checkpoint_prefers_cuda() -> None:
     """load_checkpoint prefers CUDA when available."""
     fake_module = MagicMock()

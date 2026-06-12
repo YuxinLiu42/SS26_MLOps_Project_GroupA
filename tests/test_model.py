@@ -74,6 +74,27 @@ def _make_batch(input_len: int = 10) -> dict:
     }
 
 
+def _make_val_batch(input_len: int = 10, gen_len: int = 8) -> dict:
+    """Build a collated val batch with supervised plus generation inputs.
+
+    Mirrors DataModule._collate_val: the teacher-forced tensors carry the
+    answer, the gen_* encodings do not. gen_input_ids is intentionally a
+    different shape and value than input_ids so tests can verify generation
+    uses the answer-free encoding rather than the supervised one.
+
+    Args:
+        input_len: Number of tokens in the supervised input_ids.
+        gen_len: Number of tokens in the answer-free gen_input_ids.
+
+    Returns:
+        Dict matching _collate_val output for a batch of one sample.
+    """
+    batch = _make_batch(input_len)
+    batch["gen_input_ids"] = torch.ones(1, gen_len, dtype=torch.long)
+    batch["gen_attention_mask"] = torch.ones(1, gen_len, dtype=torch.long)
+    return batch
+
+
 @pytest.fixture()
 def module() -> PaliGemmaModule:
     """Provide a PaliGemmaModule with all HuggingFace I/O mocked out.
@@ -278,22 +299,80 @@ class TestValidationStep:
         """validation_step must return None; Lightning handles aggregation itself."""
         setattr(module, "log", MagicMock())
         # validation_step returns None; call and verify no exception raised
-        module.validation_step(_make_batch(), batch_idx=0)
+        module.validation_step(_make_val_batch(), batch_idx=0)
 
     def test_logs_val_loss_with_correct_kwargs(self, module: PaliGemmaModule) -> None:
-        """self.log must be called with on_step=False, on_epoch=True, prog_bar=True."""
+        """val/loss must be logged with on_step=False, on_epoch=True, prog_bar=True."""
         mock_log = MagicMock()
         setattr(module, "log", mock_log)
         mock_model = module.model
         assert isinstance(mock_model, MagicMock)
-        module.validation_step(_make_batch(), batch_idx=0)
-        mock_log.assert_called_once_with(
+        module.validation_step(_make_val_batch(), batch_idx=0)
+        mock_log.assert_any_call(
             "val/loss",
             mock_model.return_value.loss,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
         )
+
+    def test_logs_val_accuracy_with_correct_kwargs(
+        self, module: PaliGemmaModule
+    ) -> None:
+        """val/accuracy must be logged with on_step=False, on_epoch=True."""
+        mock_log = MagicMock()
+        setattr(module, "log", mock_log)
+        module.validation_step(_make_val_batch(), batch_idx=0)
+        mock_log.assert_any_call(
+            "val/accuracy",
+            pytest.approx(1.0),
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
+
+    def test_generation_uses_answer_free_inputs(self, module: PaliGemmaModule) -> None:
+        """model.generate must receive gen_input_ids, not teacher-forced input_ids.
+
+        The supervised input_ids contain the answer suffix; generating from
+        them would leak the answer into the prompt.
+        """
+        setattr(module, "log", MagicMock())
+        batch = _make_val_batch(input_len=10, gen_len=8)
+        module.validation_step(batch, batch_idx=0)
+        mock_model = module.model
+        assert isinstance(mock_model, MagicMock)
+        call_kwargs = mock_model.generate.call_args.kwargs
+        assert torch.equal(call_kwargs["input_ids"], batch["gen_input_ids"])
+        assert torch.equal(call_kwargs["attention_mask"], batch["gen_attention_mask"])
+
+    def test_decodes_only_tokens_beyond_gen_prompt(
+        self, module: PaliGemmaModule
+    ) -> None:
+        """batch_decode must receive only tokens beyond the gen prompt length.
+
+        generate() returns (1, 12); gen_input_ids has 8 tokens, so the decoded
+        slice must have width 4 — proving the slice offset comes from the
+        generation encoding, not the longer supervised one.
+        """
+        setattr(module, "log", MagicMock())
+        module.validation_step(_make_val_batch(input_len=10, gen_len=8), batch_idx=0)
+        mock_processor = module.processor
+        assert isinstance(mock_processor, MagicMock)
+        pred_tensor = mock_processor.batch_decode.call_args_list[0].args[0]
+        assert pred_tensor.shape[1] == 4
+
+    def test_forward_does_not_receive_gen_tensors(
+        self, module: PaliGemmaModule
+    ) -> None:
+        """The loss forward pass must not receive gen_* keys as kwargs."""
+        setattr(module, "log", MagicMock())
+        module.validation_step(_make_val_batch(), batch_idx=0)
+        mock_model = module.model
+        assert isinstance(mock_model, MagicMock)
+        forward_kwargs = mock_model.call_args.kwargs
+        assert all(not k.startswith("gen_") for k in forward_kwargs)
+        assert "input_ids" in forward_kwargs
 
 
 class TestTestStep:

@@ -192,36 +192,83 @@ class PaliGemmaModule(L.LightningModule):
         return loss
 
     def validation_step(self, batch: dict, batch_idx: int) -> None:
-        """Compute validation loss on a validation batch.
+        """Compute val loss and generation-based exact-match accuracy.
+
+        val/loss comes from the teacher-forced tensors. val/accuracy is
+        computed exactly like test_step — generate from the answer-free gen_*
+        encodings and exact-match against the answer letters. Generating from
+        the supervised input_ids instead would leak the answer into the
+        prompt. The two metrics can disagree (sweep #1: the best-val/loss
+        trial scored 3 pts below the baseline on test accuracy), which is why
+        checkpointing, early stopping, and the W&B sweep select on
+        val/accuracy.
 
         Args:
-            batch: Dict of tensors from DataModule._collate, including 'labels'.
+            batch: Dict from DataModule._collate_val with supervised tensors
+                plus gen_input_ids / gen_attention_mask / answer_texts.
             batch_idx: Index of the current batch (unused).
         """
-        # Keep only tensor inputs; drop metadata lists (see training_step).
-        model_inputs = {k: v for k, v in batch.items() if isinstance(v, torch.Tensor)}
+        # Keep only tensor inputs; drop metadata lists (see training_step) and
+        # the gen_* generation encodings, which are not forward() kwargs.
+        model_inputs = {
+            k: v
+            for k, v in batch.items()
+            if isinstance(v, torch.Tensor) and not k.startswith("gen_")
+        }
         outputs = self.model(**model_inputs)
         loss = outputs.loss
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
+        acc = self._generation_exact_match(
+            input_ids=batch["gen_input_ids"],
+            attention_mask=batch.get("gen_attention_mask"),
+            pixel_values=batch.get("pixel_values"),
+            targets=batch["answer_texts"],
+        )
+        self.log("val/accuracy", acc, on_step=False, on_epoch=True, prog_bar=True)
+
     def test_step(self, batch: dict, batch_idx: int) -> None:
         """Generate predictions and compute exact-match accuracy on a test batch.
 
-        Decodes generated tokens and compares against the ground-truth answer
-        letter derived from the dataset's `answer` index (carried through
-        _collate), not by decoding the -100-masked labels.
+        Test batches come from _collate_eval, so input_ids are already
+        answer-free. Ground truth is the answer letter derived from the
+        dataset's `answer` index (carried through _collate), not a decode of
+        the -100-masked labels.
 
         Args:
             batch: Dict from DataModule._collate, including 'answer_texts'.
             batch_idx: Index of the current batch (unused).
         """
-        input_ids = batch["input_ids"]
-        pixel_values = batch.get("pixel_values")
-        attention_mask = batch.get("attention_mask")
+        acc = self._generation_exact_match(
+            input_ids=batch["input_ids"],
+            attention_mask=batch.get("attention_mask"),
+            pixel_values=batch.get("pixel_values"),
+            targets=batch["answer_texts"],
+        )
+        self.log("test/accuracy", acc, on_step=False, on_epoch=True, prog_bar=True)
 
+    def _generation_exact_match(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+        pixel_values: torch.Tensor | None,
+        targets: list[str],
+    ) -> float:
+        """Generate from answer-free inputs and exact-match against targets.
+
+        Args:
+            input_ids: Prompt-only token ids (must NOT contain the answer).
+            attention_mask: Mask for input_ids; avoids attending to padding.
+            pixel_values: Preprocessed image tensors for the batch.
+            targets: Ground-truth answer letters derived from the `answer`
+                index (e.g. "A") — never a tokenize→mask→decode round-trip.
+
+        Returns:
+            Exact-match accuracy in [0, 1] for the batch.
+        """
         generated_ids = self.model.generate(  # type: ignore[misc]
             input_ids=input_ids,
-            attention_mask=attention_mask,  # avoid attending to padding
+            attention_mask=attention_mask,
             pixel_values=pixel_values,
             max_new_tokens=10,
             do_sample=False,
@@ -234,15 +281,10 @@ class PaliGemmaModule(L.LightningModule):
             skip_special_tokens=True,
         )
 
-        # Ground truth = answer letter derived from the dataset's `answer`
-        # index (e.g. "A") — never a tokenize→mask→decode round-trip.
-        targets = batch["answer_texts"]
-
         correct = sum(
             p.strip().upper() == t.strip().upper() for p, t in zip(preds, targets)
         )
-        acc = correct / len(preds)
-        self.log("test/accuracy", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return correct / len(preds)
 
     def configure_optimizers(self):
         """Configure AdamW optimizer with cosine annealing scheduler.

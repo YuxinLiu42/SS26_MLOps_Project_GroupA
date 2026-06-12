@@ -1,0 +1,19 @@
+# Cloud Build config for the training image (amd64-native build — the laptop
+# is arm64, so local docker builds of the CUDA image are not usable on Vertex).
+# Usage:
+#   gcloud builds submit --async --config=cloud/cloudbuild.train.yaml \
+#     --project=paligemma-scienceqa .
+# What gets uploaded is governed by .gcloudignore (data/, checkpoints/, .venv,
+# secrets are excluded; the data .dvc pointers ship so dvc pull works on-GPU).
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - dockerfiles/train.dockerfile
+      - -t
+      - europe-west4-docker.pkg.dev/paligemma-scienceqa/mlops-images/paligemma-train:latest
+      - .
+images:
+  - europe-west4-docker.pkg.dev/paligemma-scienceqa/mlops-images/paligemma-train:latest
+timeout: 3600s

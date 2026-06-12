@@ -2,13 +2,23 @@
 # Usage:
 #   wandb sweep configs/sweep.yaml          # register sweep, get SWEEP_ID
 #   wandb agent <entity>/<project>/SWEEP_ID # launch agent
+#
+# Sweep #2 (revised after the 2026-06-12 baseline+8-trial results):
+#   - Optimize val/accuracy, NOT val/loss. Sweep #1 proved they disagree:
+#     the best-val/loss trial (lr 1.41e-4, val/loss 0.315) scored 55.9% test
+#     accuracy while the baseline (val/loss 0.3765) scored 58.85%.
+#   - model.py logs generation-based exact-match "val/accuracy" every val
+#     epoch (from the answer-free gen_* encodings of _collate_val), and
+#     checkpointing + early stopping select on it (mode=max).
+#   - Register a FRESH sweep id. Do not resume sweep #1 via SWEEP_ID: its
+#     Bayesian history optimized val/loss and would bias this search.
 
 program: train.py
 method: bayes
 
 metric:
-  name: val/loss
-  goal: minimize
+  name: val/accuracy
+  goal: maximize
 
 # Each run gets one combination; agent calls train.py with Hydra overrides.
 command:
@@ -19,26 +29,38 @@ command:
   - ${args_no_hyphens}   # Hydra expects key=value, not --key value
 
 parameters:
-  model.learning_rate:
+  model.base_learning_rate:
     distribution: log_uniform_values
-    # ~1 decade centered (log) on the working 1e-4 baseline. Floor is above the
-    # observed-too-small 1e-5; ceiling lets the sweep explore the higher LRs
-    # LoRA often prefers (the old 1e-6..1e-4 wasted most runs on too-small LRs
-    # and couldn't search above the baseline).
-    min: 3e-5
-    max: 3e-4
+    # Swept as the BASE lr defined at reference_effective_batch=16; train.py
+    # derives the actual lr via the sqrt batch-size rule
+    # (lr = base * sqrt(eff_batch / 16)), keeping this dimension decoupled
+    # from accumulate_grad_batches. model.learning_rate must stay null in
+    # configs/model/ or every trial silently bypasses the scaling.
+    # Sweep #1 evidence: every trial at lr <= 4e-5 landed at 50.1-54.1% test
+    # accuracy; lr 1.0e-4-1.4e-4 landed at 55.9-58.9%. Floor raised above the
+    # dead zone so Bayes can't camp there again. The region above 1.4e-4 was
+    # never visited in sweep #1 (the agent chased val/loss minima at the low
+    # edge), so the ceiling sits above the best-observed lr to search it.
+    min: 7e-5
+    max: 2e-4
 
   data.batch_size:
-    # bs=8 with max_length=512 (256 image + text) risks OOM on an L4 24GB and
-    # would waste sweep runs; bs=4 is the confirmed-good baseline.
-    values: [2, 4]
+    # Fixed: bs=2 (sweep-3, eff. batch 16) matched bs=4 quality (58.30% vs
+    # 58.85%) but needs 2x the optimizer steps for the same effective batch;
+    # bs=8 risks OOM on an L4 with max_length=512. Not worth a dimension.
+    value: 4
 
   trainer.accumulate_grad_batches:
+    # Effective batch 16 (4x4) took the top two spots in sweep #1 (58.85% /
+    # 58.30%), but eff. 8 and eff. 32 only ever ran at LRs that were not
+    # noise-equivalent (eff. 32's one trial sat at a dead lr 3.3e-5). With the
+    # sqrt rule deriving a comparable lr per effective batch, all three sizes
+    # get a fair shot.
     values: [2, 4, 8]
 
   # NOTE: epochs are intentionally NOT swept. max_epochs=8 + EarlyStopping
-  # (patience=3 on val/loss) lets each run train as long as it keeps improving
-  # and stop on plateau — sweeping epochs would just burn runs comparing
+  # (patience=3) lets each run train as long as it keeps improving and stop
+  # on plateau — sweeping epochs would just burn runs comparing
   # training-length against LR/batch effects. To search capacity instead, add
   # model.lora_r or model.lora_target_modules here.
 
