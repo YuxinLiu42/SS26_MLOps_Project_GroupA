@@ -79,7 +79,16 @@ The LR pattern also held: trials at `base_lr ≈ 1.8–1.96e-4` reached
 0.65–0.70 `val/accuracy`; the two low-LR trials (~8e-5) sat at the bottom —
 which is why sweep #2 raised the LR floor above sweep #1's dead zone.
 
-## Figures (`reports/figures/`)
+## Artifact layout (`reports/`)
+
+| Folder | Contents |
+|---|---|
+| `figures/` | `.png` visualizations (below) |
+| `eval/` | evaluation data: `production_eval_results.json`, `sweep2_summary.json` |
+| `monitoring/` | `drift_report.html` (Evidently) |
+| `load/` | load-test summary + locust CSVs |
+
+### Figures (`reports/figures/`)
 
 | File | Shows |
 |---|---|
@@ -91,9 +100,9 @@ which is why sweep #2 raised the LR floor above sweep #1's dead zone.
 Reproduce with the committed source JSONs:
 
 ```bash
-python -m project_name.visualize subject-accuracy reports/figures/production_eval_results.json
-python -m project_name.visualize sweep-comparison  reports/figures/sweep2_summary.json
-python -m project_name.visualize pred-lengths       reports/figures/production_eval_results.json
+python -m project_name.visualize subject-accuracy reports/eval/production_eval_results.json
+python -m project_name.visualize sweep-comparison  reports/eval/sweep2_summary.json
+python -m project_name.visualize pred-lengths       reports/eval/production_eval_results.json
 ```
 
 ## Cloud workload inventory (what runs where, and why)

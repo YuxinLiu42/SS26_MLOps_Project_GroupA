@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 app = typer.Typer(help="Data-drift monitoring for ScienceQA inputs.")
 
-RESULTS_DIR = Path("reports/figures")
+RESULTS_DIR = Path("reports/monitoring")
 
 
 def _features(split) -> pd.DataFrame:
