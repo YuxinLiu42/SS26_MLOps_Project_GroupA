@@ -56,6 +56,33 @@ API_URL=http://localhost:8000 \
   uv run --group serving streamlit run src/project_name/frontend.py
 ```
 
+## Deploy to Cloud Run
+
+Build the API image (amd64) and deploy. The service reads its adapter from
+`CHECKPOINT_PATH` (a `gs://` path), so promoting a new model needs no redeploy.
+
+```bash
+# 1. build + push the API image
+gcloud builds submit --config=cloud/cloudbuild.api.yaml --project=paligemma-scienceqa .
+
+# 2. deploy (CPU, scale-to-zero, lazy model load)
+gcloud run deploy paligemma-api \
+  --image europe-west4-docker.pkg.dev/paligemma-scienceqa/mlops-images/paligemma-api:latest \
+  --region europe-west4 --project paligemma-scienceqa \
+  --execution-environment gen2 \
+  --memory 32Gi --cpu 8 \
+  --timeout 3600 --concurrency 1 --max-instances 3 --min-instances 0 \
+  --set-env-vars CHECKPOINT_PATH=gs://mlops-paligemma-west4/models/production,PREDICT_DEVICE=cpu,LAZY_LOAD=1 \
+  --set-secrets HF_TOKEN=hf-token:latest \
+  --service-account 581237630637-compute@developer.gserviceaccount.com \
+  --allow-unauthenticated
+```
+
+Notes: `concurrency 1` keeps one heavy inference per instance (avoids OOM on the
+3B model); `max-instances 3` lets overflow requests spin new instances instead
+of returning 429. First call to each instance is slow (~160 s) — it downloads
+the base model and loads on CPU; later calls are ~10–27 s.
+
 ## Ops
 
 ```bash

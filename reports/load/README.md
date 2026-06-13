@@ -17,9 +17,14 @@ uv run --group serving locust -f tests/load/locustfile.py \
 
 - **CPU inference dominates**: successful `/predict` calls take ~10–27 s
   (PaliGemma2-3B on CPU, no GPU). Cold start is ~160 s (model download + load).
-- **429 "Rate exceeded" under concurrency**: the service is deployed with
-  `--max-instances 1 --concurrency 1` (cost-controlled, scale-to-zero), so it
-  serializes requests and rejects the overflow. Raising concurrency/instances
-  (or moving to a GPU) would lift throughput at higher cost.
+- **429 "Rate exceeded" under concurrency**: this run was against the initial
+  deploy (`--max-instances 1 --concurrency 1`), so the service served one
+  request at a time and rejected the overflow — and a health check colliding
+  with an in-flight `/predict` was also 429'd. We then raised the service to
+  `--max-instances 3 --concurrency 1`: overflow now spins a new instance
+  instead of 429-ing, while still one heavy inference per instance (avoids
+  OOM on the 3B model) and scale-to-zero when idle. Re-running the load test
+  against the new config should show fewer 429s (at the cost of more cold
+  starts, since each new instance downloads the base model on its first call).
 
 Raw stats in `scienceqa_stats.csv` / `scienceqa_stats_history.csv`.
