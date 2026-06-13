@@ -62,11 +62,12 @@ dev = [
     "pytest-timeout>=2.4.0",
     "google-cloud-aiplatform>=1.154.0",
 ]
-# Local ops/serving extras (frontend + load testing); not needed in the
+# Local ops/serving extras (frontend, load testing, drift); not needed in the
 # training or API images.
 serving = [
     "streamlit>=1.40.0",
     "locust>=2.32.0",
+    "evidently>=0.4,<0.7",  # stable Report/DataDriftPreset API
 ]
 
 
