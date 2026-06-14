@@ -434,6 +434,10 @@ def train(cfg: DictConfig) -> float:
         except Exception:  # pragma: no cover - wandb offline / no run
             run_tag = cfg.trainer.wandb.run_name or "run"
     adapter_dir = Path(cfg.trainer.ckpt_dir) / f"adapter-{run_tag}"
+    # The adapter/ckpt is saved locally and (for LoRA) already logged to W&B
+    # above, so a transient GCS error on the staging upload must NOT fail the
+    # run — that would mark an otherwise-successful sweep trial 'failed' and
+    # lose only the recoverable GCS copy. Warn and continue.
     if cfg.model.use_lora:
         model.save_adapter(adapter_dir)
         if logger is not None:
@@ -442,14 +446,27 @@ def train(cfg: DictConfig) -> float:
             )
         model_dir = os.environ.get("AIP_MODEL_DIR")
         if model_dir:
-            uri = upload_dir_to_gcs(adapter_dir, model_dir)
-            log.info("Uploaded LoRA adapter to %s", uri)
+            try:
+                uri = upload_dir_to_gcs(adapter_dir, model_dir)
+                log.info("Uploaded LoRA adapter to %s", uri)
+            except Exception:
+                log.exception(
+                    "GCS upload of the adapter to %s failed — continuing "
+                    "(adapter is in W&B; re-upload separately if needed)",
+                    model_dir,
+                )
     else:
         # No LoRA → fall back to uploading the full checkpoint file.
         model_dir = os.environ.get("AIP_MODEL_DIR")
         if model_dir and best_ckpt:
-            uri = upload_to_gcs(Path(best_ckpt), model_dir)
-            log.info("Uploaded full checkpoint to %s", uri)
+            try:
+                uri = upload_to_gcs(Path(best_ckpt), model_dir)
+                log.info("Uploaded full checkpoint to %s", uri)
+            except Exception:
+                log.exception(
+                    "GCS upload of the checkpoint to %s failed — continuing",
+                    model_dir,
+                )
 
     if cfg.trainer.wandb.enabled:
         wandb.finish()
