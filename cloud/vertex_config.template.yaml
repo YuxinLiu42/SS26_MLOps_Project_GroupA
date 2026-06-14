@@ -21,7 +21,7 @@ workerPoolSpecs:
         - data.num_workers=4
       env:
         - name: SWEEP_COUNT
-          value: "8"
+          value: "${SWEEP_COUNT}"
         - name: SKIP_BASELINE
           value: "${SKIP_BASELINE}"
         - name: SWEEP_ID

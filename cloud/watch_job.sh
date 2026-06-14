@@ -144,8 +144,8 @@ create_job() {
   #   SWEEP_ID=e/p/id  resume an existing sweep after preemption (FRESH sweep
   #                    when empty — required after a metric/range change)
   export SKIP_BASELINE="${SKIP_BASELINE:-0}" SWEEP_ID="${SWEEP_ID:-}" \
-    ADAPTER_GCS="${ADAPTER_GCS:-}"
-  envsubst '${IMAGE_URI} ${SKIP_BASELINE} ${SWEEP_ID} ${ADAPTER_GCS}' \
+    ADAPTER_GCS="${ADAPTER_GCS:-}" SWEEP_COUNT="${SWEEP_COUNT:-8}"
+  envsubst '${IMAGE_URI} ${SKIP_BASELINE} ${SWEEP_ID} ${ADAPTER_GCS} ${SWEEP_COUNT}' \
     < "${TEMPLATE}" > "${RENDERED}"
   if [ -z "${SWEEP_ID}" ]; then
     # Vertex rejects env entries with an empty value ("Required field is not
