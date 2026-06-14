@@ -1,8 +1,8 @@
 {
   "sweep_id": "win9arpw",
-  "best_run": "autumn-sweep-2",
+  "best_run": "sandy-sweep-7",
   "baseline_test_accuracy": 0.6401,
-  "winner_test_accuracy": 0.7129,
+  "winner_test_accuracy": 0.7219,
   "trials": [
     {
       "name": "sandy-sweep-7",
