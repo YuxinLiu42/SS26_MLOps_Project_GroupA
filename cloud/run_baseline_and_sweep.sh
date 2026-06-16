@@ -90,7 +90,13 @@ PY
   echo ">>> best sweep run by val/accuracy: ${BEST_RUN}"
   ADAPTER_DIR="checkpoints/adapter-${BEST_RUN}"
   [ -d "${ADAPTER_DIR}" ] || { echo "!!! ${ADAPTER_DIR} not found on disk"; exit 1; }
+  # --batch-size 1: evaluate one sample at a time (no left-padding), matching how
+  # the API serves each /predict request — makes this number deterministic and
+  # serving-faithful, and removes the ~0.05% batched-greedy bf16 argmax flip seen
+  # between batch sizes. Slower, but the test split is small and this runs once on
+  # the sweep winner.
   python -m project_name.evaluate "${ADAPTER_DIR}" --by-subject \
+    --batch-size 1 \
     --output-path eval_results.json
   if [ -n "${AIP_MODEL_DIR:-}" ]; then
     python - <<'PY'

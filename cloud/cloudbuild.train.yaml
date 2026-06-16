@@ -17,3 +17,8 @@ steps:
 images:
   - europe-west4-docker.pkg.dev/paligemma-scienceqa/mlops-images/paligemma-train:latest
 timeout: 3600s
+# The triggers run builds as a custom service account (the compute SA), and
+# Cloud Build then refuses the default logs bucket — pick an explicit logging
+# destination. CLOUD_LOGGING_ONLY sends build logs to Cloud Logging.
+options:
+  logging: CLOUD_LOGGING_ONLY
