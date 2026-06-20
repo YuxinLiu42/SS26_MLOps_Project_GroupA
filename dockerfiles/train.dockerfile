@@ -33,4 +33,7 @@ ENV PATH="/usr/local/nvidia/bin:/workspace/.venv/bin:$PATH"
 # libcuda.so.1 and torch.cuda.is_available() is False even with a CUDA build.
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib64:/usr/local/nvidia/lib"
 
+# The image has no .git (.dockerignore excludes it), so DVC must run in "no SCM"
+# mode or `dvc pull` errors looking for a git repo. Belt-and-suspenders with the
+# copied .dvc/config so the image is correct regardless of the local setting.
 RUN dvc config core.no_scm true

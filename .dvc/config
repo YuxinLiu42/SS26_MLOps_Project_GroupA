@@ -1,7 +1,9 @@
 [core]
     remote = gs-west4
+    # no_scm=true because dvc also runs inside the Vertex training container,
+    # which ships the .dvc pointers but not .git (see .dockerignore +
+    # dockerfiles/train.dockerfile). Without it, `dvc pull` errors looking for a
+    # git repo. The .dvc pointer files are staged into git manually.
     no_scm = true
-['remote "myremote"']
-    url = gs://mlops_paligemma
 ['remote "gs-west4"']
     url = gs://mlops-paligemma-west4/dvcstore
