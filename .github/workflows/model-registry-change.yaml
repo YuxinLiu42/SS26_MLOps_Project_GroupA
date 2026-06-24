@@ -50,12 +50,14 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Roll the promoted model out to Cloud Run
-        # A new revision cold-starts and lazy-loads the latest adapter from
-        # gs://.../models/production on its first request — no rebuild needed.
+        # Shift 100% traffic to the latest ready revision. This avoids creating
+        # a new revision (which requires Artifact Registry download permission
+        # on the deployer identity) while still enforcing the intended live
+        # rollout target before smoke-testing.
         run: |
-          gcloud run services update "$SERVICE" \
+          gcloud run services update-traffic "$SERVICE" \
             --region="$REGION" --project="$GCP_PROJECT" \
-            --update-labels=model-rollout=run-${{ github.run_id }}
+            --to-latest
 
       - name: Smoke-test the production endpoint
         run: |
