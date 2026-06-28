@@ -143,10 +143,10 @@ def _log_rss(tag: str) -> None:
 def _mask_pruned_grads(model: torch.nn.Module) -> None:
     """Zero the gradient at pruned (zero) Linear weights so the model stays sparse.
 
-    This is the memory-lean alternative to a live ``prune`` reparametrization
-    (``bake_mask=False``), which keeps weight_orig + weight_mask + the computed
-    weight (~3x weight memory) and OOMs the 24GB L4. Here the weights are dense
-    (already zeroed) and only their *gradients* are masked, via a backward hook.
+    This is the memory-lean alternative to a live ``prune`` reparametrization,
+    which keeps weight_orig + weight_mask + the computed weight (~3x weight
+    memory) and OOMs the 24GB L4. Here the weights are dense (already zeroed) and
+    only their *gradients* are masked, via a backward hook.
     Frozen params get no gradient, so only trainable Linears need it.
     """
     for module in model.modules():
@@ -343,12 +343,12 @@ def prune_finetune(
     """Prune to ``sparsity``, then masked-fine-tune to recover accuracy.
 
     One-shot pruning degrades accuracy sharply; this re-trains the *surviving*
-    weights to recover it. The prune mask is kept LIVE (``weight = weight_orig *
-    mask`` via ``bake_mask=False``), so the zeroed weights receive no gradient and
-    stay zero -- the model remains sparse throughout. The vision tower is frozen
-    and only the language model is fine-tuned (8-bit AdamW + gradient
-    checkpointing) to fit the 24GB L4. Reports test accuracy before (one-shot) and
-    after fine-tuning -- the recovery is the headline.
+    weights to recover it. The weights are pruned (dense, zeroed) and kept sparse
+    by masking the *gradient* at zeroed positions (``_mask_pruned_grads``), so they
+    never re-grow. The vision tower is frozen and only the language model is
+    fine-tuned (8-bit AdamW + gradient checkpointing) to fit the 24GB L4. Reports
+    test accuracy before (one-shot) and after fine-tuning -- the recovery is the
+    headline.
     """
     if not torch.cuda.is_available():
         typer.echo("CUDA required (fine-tuning + generation).", err=True)
@@ -365,12 +365,12 @@ def prune_finetune(
     )
     data.setup()
 
-    # Prune into DENSE zeroed weights (bake_mask=True). The live reparametrization
-    # (bake_mask=False) keeps weight_orig + weight_mask + the computed weight per
-    # layer -- ~3x the weight memory, which OOM'd the 24GB L4. We instead mask the
+    # Prune into DENSE zeroed weights. A live prune reparametrization (keeping
+    # weight_orig + weight_mask + the computed weight per layer) is ~3x the weight
+    # memory and OOM'd the 24GB L4, so we instead bake the zeros and mask the
     # GRADIENTS below, so pruned weights never re-grow with no extra weight copies.
     model = _load_merged(adapter_dir)
-    achieved = prune_linear_layers(model, sparsity, bake_mask=True)
+    achieved = prune_linear_layers(model, sparsity)
     _log_rss(f"after prune (sparsity {achieved:.3f})")
 
     # One-shot accuracy (pre-fine-tune) -- the baseline this run tries to recover.
