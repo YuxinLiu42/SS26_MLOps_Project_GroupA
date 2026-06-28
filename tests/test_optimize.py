@@ -114,7 +114,7 @@ def test_grad_masking_preserves_sparsity() -> None:
 
 
 def test_cli_exposes_commands() -> None:
-    """run_optimize.sh invokes these exact subcommands — keep the names stable."""
+    """run_optimize.sh invokes these exact subcommands for keeping the names stable."""
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0, result.output
     assert "benchmark" in result.output
