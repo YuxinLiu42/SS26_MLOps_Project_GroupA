@@ -11,6 +11,35 @@ accuracy on the 2,017-sample test split. Full results in
 [`reports/RESULTS.md`](reports/RESULTS.md); usage in
 [`docs/source/usage.md`](docs/source/usage.md).
 
+## Architecture
+
+End-to-end pipeline — data versioning, training, evaluation, model registry,
+serving, monitoring, and inference optimization, glued by CI/CD:
+
+```mermaid
+flowchart TD
+    HF["HF ScienceQA-IMG"] --> PRE["preprocess<br/>(data.py)"]
+    PRE --> DVC[("DVC store<br/>· GCS")]
+    CFG["Hydra configs"] --> TRAIN
+    DVC --> TRAIN["Vertex AI training<br/>LoRA + Lightning (train.py)"]
+    TRAIN --> WB[("W&B<br/>sweeps · runs · registry")]
+    TRAIN --> EVAL["evaluate.py<br/>(test accuracy)"]
+    WB -->|"production alias"| GCS[("GCS<br/>models/production")]
+    GCS --> API["FastAPI service<br/>(api.py) · Cloud Run / local"]
+    API --> FE["Streamlit UI<br/>(frontend.py)"]
+    API --> MON["drift monitoring<br/>(monitoring.py)"]
+    GCS --> OPT["optimize.py on Vertex<br/>int4/compile benchmark · prune-sweep"]
+    EVAL --> REP["reports/RESULTS.md"]
+    OPT --> REP
+
+    subgraph CICD["CI/CD"]
+        GHA["GitHub Actions<br/>tests · lint · docs"]
+        CB["Cloud Build<br/>API image"]
+    end
+    GHA -.-> TRAIN
+    CB -.-> API
+```
+
 ## Project description
 
 ### Overall goal of the project

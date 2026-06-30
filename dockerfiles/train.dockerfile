@@ -26,13 +26,17 @@ COPY wheelhouse/ wheelhouse/
 RUN mkdir -p models
 
 # Install scipali from a PREBUILT wheel (built outside the image with `uv build`
-# and shipped in wheelhouse/). Building the project IN-image with `uv sync`
-# dropped its subpackages -- only the top-level `scipali` survived, so
-# `python -m scipali.models.optimize` failed at runtime with
-# `ModuleNotFoundError: No module named 'scipali.models'` (a uv build behaviour
-# from the moving base image; pinning uv did not fix it). The locally-built
-# wheel is verified to contain every subpackage. Deps are installed above, so
-# install the wheel with --no-deps.
+# on the dev host and shipped in wheelhouse/). Building the project IN-image drops
+# its subpackages -- only top-level `scipali` survives, so
+# `python -m scipali.models.optimize` fails with
+# `ModuleNotFoundError: No module named 'scipali.models'`. This was reproduced with
+# both `uv sync` and `uv build`, even after pinning uv 0.11.6 via COPY --from, so
+# it is a uv/uv_build behaviour we could not fix in-image. The locally-built wheel
+# (verified to contain every subpackage) is the reliable path.
+#   CAVEAT: a build from the bare git repo / CI has no wheelhouse and fails the
+#   COPY above -- this image is built MANUALLY via /tmp staging that injects the
+#   wheel (the mlops-ci-train trigger does not build it). Deps are installed
+#   above, so install the wheel with --no-deps.
 RUN uv pip install --no-deps --reinstall wheelhouse/*.whl
 RUN uv pip install --no-cache-dir --reinstall torch==2.6.0 torchvision==0.21.0 \
       --index-url https://download.pytorch.org/whl/cu118

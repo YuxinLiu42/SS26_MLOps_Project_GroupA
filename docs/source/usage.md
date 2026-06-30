@@ -40,6 +40,45 @@ TEMPLATE=cloud/vertex_eval.template.yaml RENDERED=cloud/vertex_eval.yaml \
   bash cloud/watch_job.sh
 ```
 
+## Optimize: quantization + pruning (M31)
+
+Inference-optimization experiments on an L4 (results feed `reports/RESULTS.md`).
+Run on Vertex via `cloud/run_optimize.sh` + `watch_job.sh`:
+
+```bash
+# quantization benchmark: bf16 vs int4 (bitsandbytes) vs bf16+torch.compile
+TEMPLATE=cloud/vertex_optimize.template.yaml RENDERED=cloud/vertex_optimize.yaml \
+  DISPLAY_NAME=paligemma-optimize \
+  ADAPTER_GCS=gs://mlops-paligemma-west4/models/production \
+  bash cloud/watch_job.sh
+
+# weight-pruning sweep: accuracy vs sparsity over the full test split
+# (SKIP_BENCHMARK=1 runs prune-only; fits a 32GB host via a histogram threshold)
+SKIP_BENCHMARK=1 PRUNE_SPARSITIES=0.0,0.3,0.5,0.7 PRUNE_N_BATCHES=0 \
+  TEMPLATE=cloud/vertex_optimize.template.yaml RENDERED=cloud/vertex_optimize.yaml \
+  DISPLAY_NAME=paligemma-prune \
+  ADAPTER_GCS=gs://mlops-paligemma-west4/models/production \
+  bash cloud/watch_job.sh
+```
+
+The underlying Typer CLI (CUDA-only; runs inside the L4 container):
+
+```bash
+python -m scipali.models.optimize benchmark <adapter_dir> --output-path optimize_results.json
+python -m scipali.models.optimize prune-sweep <adapter_dir> \
+  --sparsities 0.0,0.3,0.5,0.7 --output-path prune_results.json
+```
+
+> A `prune-finetune` command (prune → masked fine-tune to recover accuracy) also
+> exists, but it is **explored, not a deliverable**: pruning is an inference-time
+> technique, and a short fine-tune recovered only ~1 pt — so we report the
+> one-shot accuracy-vs-sparsity curve instead.
+
+> **Build note:** the train/optimize image installs a locally-built wheel, so it
+> is built **manually** via `/tmp` staging (a bare `gcloud builds submit` from the
+> iCloud working dir stalls). The `mlops-ci-train` trigger is therefore disabled;
+> `mlops-ci-api` still builds the API image on push.
+
 ## Predict / serve
 
 ```bash
@@ -54,8 +93,12 @@ CHECKPOINT_PATH=checkpoints/adapter-production PREDICT_DEVICE=cpu \
 # Streamlit frontend over the API — launched standalone via uvx (it imports no
 # project code, and Streamlit's Starlette server conflicts with FastAPI's
 # pinned starlette, so it is kept out of the project env on purpose).
+# Two modes: "Ask your own" (type a question) and "Pick from ScienceQA" (browse
+# the processed test split by subject/topic and compare to ground truth). The
+# dataset picker needs `--with datasets` + the local processed split; "Ask your
+# own" works without either.
 API_URL=http://localhost:8000 \
-  uvx --with requests --with pillow \
+  uvx --with requests --with pillow --with datasets \
   streamlit run src/scipali/serving/frontend.py
 ```
 

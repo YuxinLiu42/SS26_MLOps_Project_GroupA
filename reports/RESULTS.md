@@ -11,6 +11,11 @@ Self-contained results summary for the exam report (paste into Q12/Q14/Q17).
 All numbers are exact-match accuracy of the generated answer **letter** on the
 held-out ScienceQA-IMG test split (2017 samples).
 
+**Pipeline.** The end-to-end MLOps pipeline that produced these numbers — data
+versioning, training, evaluation, model registry, serving, drift monitoring, and
+the inference optimization reported below — is diagrammed in the
+[README architecture section](../README.md#architecture).
+
 **Answer matching.** Accuracy is exact match on the *extracted answer letter*:
 we take the first letter of the model's greedy generation — tolerating the rare
 wrapped or repeated outputs greedy decoding can emit (`(A)`, `A.`, `AA`) — and

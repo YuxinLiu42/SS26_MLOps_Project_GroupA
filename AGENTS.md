@@ -15,6 +15,13 @@
     `tasks.py` file.
 * The project uses `pre-commit` for managing pre-commit hooks. To run all hooks on all files, use
     `uv run pre-commit run --all-files`. For more information, refer to the `.pre-commit-config.yaml` file.
+* The project's own pipeline is exposed as `typer` CLIs under `src/scipali/`, run with
+    `uv run python -m scipali.<area>.<module> <command>` — e.g. `scipali.data.data preprocess`,
+    `scipali.models.train`, `scipali.models.evaluate`, `scipali.models.optimize prune-sweep`,
+    `scipali.serving.predict`, `scipali.monitoring.monitoring`. The full, copy-pasteable command reference
+    (data, training, evaluation, inference optimization incl. quantization + pruning, serving, deployment)
+    lives in `docs/source/usage.md` — keep that file as the canonical command catalog rather than duplicating
+    it here.
 
 # Code style
 

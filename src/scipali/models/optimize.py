@@ -382,11 +382,22 @@ def prune_finetune(
         "one-shot accuracy @ sparsity %.3f: %.4f (%d/%d)", achieved, oneshot, c0, t0
     )
 
-    # Freeze the vision tower; fine-tune only the language model (less VRAM, and
-    # that's where the task capacity is). Gradient checkpointing trades compute
-    # for memory so the 3B model + optimizer fit the L4.
+    # The merged model came from a PeftModel, so ALL its params are frozen
+    # (requires_grad=False -- PEFT trains only the LoRA adapter). Unfreeze
+    # everything, then re-freeze the vision tower -> fine-tune the language model
+    # only (less VRAM, and that's where the task capacity is). Gradient
+    # checkpointing trades compute for memory so the 3B model + optimizer fit the L4.
+    for param in model.parameters():
+        param.requires_grad = True
     for param in model.model.vision_tower.parameters():
         param.requires_grad = False
+    trainable = [p for p in model.parameters() if p.requires_grad]
+    n_trainable = sum(p.numel() for p in trainable)
+    log.info("trainable params: %d (%.2fB)", n_trainable, n_trainable / 1e9)
+    if not trainable:
+        raise RuntimeError(
+            "no trainable parameters after freezing -- check freeze logic"
+        )
     # Keep the model sparse during training: zero the gradient at pruned weights.
     _mask_pruned_grads(model)
     model.gradient_checkpointing_enable(
@@ -394,9 +405,7 @@ def prune_finetune(
     )
     model.enable_input_require_grads()
     model.train()
-    optimizer = bnb.optim.AdamW8bit(
-        [p for p in model.parameters() if p.requires_grad], lr=lr
-    )
+    optimizer = bnb.optim.AdamW8bit(trainable, lr=lr)
 
     keys = ("input_ids", "attention_mask", "pixel_values", "token_type_ids", "labels")
     step = 0
