@@ -1,0 +1,710 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Yuxin_Duc">
+      
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../usage/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>API design - PaliGemma2 · ScienceQA MLOps</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PaliGemma2 · ScienceQA MLOps" class="md-header__button md-logo" aria-label="PaliGemma2 · ScienceQA MLOps" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PaliGemma2 · ScienceQA MLOps
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PaliGemma2 · ScienceQA MLOps" class="md-nav__button md-logo" aria-label="PaliGemma2 · ScienceQA MLOps" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    PaliGemma2 · ScienceQA MLOps
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API design
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-predict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /predict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-monitordrift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /monitor/drift
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-flow-drift-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request flow &amp; drift loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design choices
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-predict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /predict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-monitordrift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /monitor/drift
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-flow-drift-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request flow &amp; drift loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design choices
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="api-design">API design</h1>
+<p>The serving API is a small FastAPI app (<code>scipali.serving.api</code>) with three
+endpoints: a health check, single-sample inference, and a data-drift check.
+The full request/response models are validated by Pydantic and published as
+OpenAPI at <code>/openapi.json</code>, with interactive docs at <code>/docs</code> (Swagger) and
+<code>/redoc</code>.</p>
+<h2 id="endpoints">Endpoints</h2>
+<table>
+<thead>
+<tr>
+<th>Method &amp; path</th>
+<th>Purpose</th>
+<th>Body / params</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /</code></td>
+<td>Health + model-loaded flag</td>
+<td>—</td>
+<td><code>{status, model_loaded}</code></td>
+</tr>
+<tr>
+<td><code>POST /predict</code></td>
+<td>Inference on one ScienceQA item</td>
+<td><code>PredictRequest</code> (JSON)</td>
+<td><code>{prediction}</code> — the answer letter</td>
+</tr>
+<tr>
+<td><code>GET /monitor/drift</code></td>
+<td>Evidently input data-drift check</td>
+<td><code>current_gcs</code> (optional gs:// override)</td>
+<td><code>DriftResponse</code></td>
+</tr>
+<tr>
+<td><code>GET /metrics</code></td>
+<td>Prometheus system metrics</td>
+<td>—</td>
+<td>Prometheus text exposition</td>
+</tr>
+</tbody>
+</table>
+<p><code>/metrics</code> is added by <code>prometheus-fastapi-instrumentator</code> (request counts by
+method/status/handler, latency histograms, request/response sizes) and can be
+scraped by Managed Prometheus. It is instrumented defensively, so the API still
+runs without the optional dependency.</p>
+<h3 id="post-predict"><code>POST /predict</code></h3>
+<div class="highlight"><pre><span></span><code>// request — PredictRequest
+{
+  &quot;question&quot;: &quot;Which property do these objects have in common?&quot;,  // required, ≥1 char
+  &quot;choices&quot;: [&quot;soft&quot;, &quot;salty&quot;, &quot;sticky&quot;],                          // required, 2–10 items
+  &quot;hint&quot;: &quot;&quot;,                                                      // optional, appended to prompt
+  &quot;lecture&quot;: &quot;&quot;,                                                   // optional, appended to prompt
+  &quot;image_b64&quot;: &quot;&lt;base64 JPEG/PNG&gt;&quot;,                                // required
+  &quot;max_new_tokens&quot;: 10                                             // optional, 1–128
+}
+// response — PredictResponse
+{ &quot;prediction&quot;: &quot;C&quot; }   // a single normalised answer letter (A/B/C/…)
+</code></pre></div>
+<h3 id="get-monitordrift"><code>GET /monitor/drift</code></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;dataset_drift&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;n_drifted_columns&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;n_columns&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;reference_rows&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6218</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;current_rows&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;current_source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gs://mlops-paligemma-west4/monitoring/current_production.csv&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>current_source</code> reports which "current" table was actually compared, so the
+verdict is never silently a self-comparison (see the drift loop below).</p>
+<h2 id="request-flow-drift-loop">Request flow &amp; drift loop</h2>
+<pre class="mermaid"><code>flowchart LR
+    client["Client"] --&gt;|"POST /predict (image_b64 + question)"| api["FastAPI /predict&lt;br/&gt;(Cloud Run, CPU)"]
+    api --&gt;|"lazy-load adapter"| model["PaliGemma2 + LoRA&lt;br/&gt;from gs://…/models/production"]
+    model --&gt;|answer letter| client
+    api --&gt;|"one JSON line/request"| logs["Cloud Logging&lt;br/&gt;(jsonPayload)"]
+    logs --&gt;|"monitoring collect"| prod[("GCS current_production.csv")]
+    ref[("GCS reference.csv&lt;br/&gt;seed-reference")] --&gt; drift["GET /monitor/drift&lt;br/&gt;(Evidently)"]
+    prod --&gt; drift
+    drift --&gt;|"dataset_drift + current_source"| client</code></pre>
+<h2 id="design-choices">Design choices</h2>
+<ul>
+<li><strong>On-demand, scale-to-zero serving (no always-on GPU).</strong> Cloud Run runs the
+  3B model on CPU (<code>--memory 32Gi --cpu 8</code>), <code>min-instances 0</code>, with <strong>lazy
+  loading</strong> (<code>LAZY_LOAD=1</code>): the container passes the startup probe immediately
+  and loads the model on the first <code>/predict</code>. First call per instance is
+  ~160 s; warm calls ~10–27 s. Cheaper than a standing GPU endpoint for a
+  course-scale workload.</li>
+<li><strong>The adapter is read from <code>gs://…/models/production</code> at startup</strong>, not baked
+  into the image, so promoting a new model needs no rebuild/redeploy — re-copy
+  the adapter and move the W&amp;B <code>production</code> alias.</li>
+<li><strong>One inference per instance</strong> (<code>concurrency 1</code>) avoids OOM on the 3B model;
+  <code>max-instances 3</code> lets overflow spin a new instance instead of returning 429.</li>
+<li><strong>Drift tables live in GCS, not the image</strong> (<code>reference.csv</code>,
+  <code>current_production.csv</code>, <code>current_sample.csv</code>), so the input distribution can
+  be refreshed without a redeploy. <code>reference.csv</code> is regenerable from committed
+  code via <code>monitoring seed-reference</code>; <code>current_production.csv</code> is materialised
+  from real traffic by <code>monitoring collect</code>.</li>
+<li><strong><code>/predict</code> logs one structured single-line JSON per request</strong> (severity
+  <code>INFO</code>) straight to stdout, <em>not</em> through the Rich logger. Rich renders at a
+  fixed 80-column width and Cloud Run stores each wrapped line as a separate
+  entry, which would fragment the JSON and break <code>collect</code>. A lone JSON object
+  is parsed by Cloud Run into <code>jsonPayload</code> and read back intact, closing the
+  drift loop end-to-end.</li>
+<li><strong>The drift comparison uses only the columns both tables share.</strong> Production
+  inputs can't carry train-only columns (e.g. <code>subject</code>, unknown at inference
+  time), so the endpoint intersects columns rather than erroring or registering
+  spurious drift.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.annotate", "navigation.sections"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
